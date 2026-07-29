@@ -4,7 +4,6 @@ import datetime
 import plotly.express as px
 import requests
 import urllib.parse
-import streamlit.components.v1 as components
 
 # =========================================================================
 # CONFIGURACIÓN INICIAL Y CREDENCIALES DE GOOGLE
@@ -102,25 +101,40 @@ if not st.session_state.autenticado:
         }
         url_login_google = f"{AUTHORIZE_URL}?{urllib.parse.urlencode(parametros_google)}"
         
-        # Inyección JavaScript para redirigir la pestaña principal directamente a Google de forma instantánea
+        # HTML encapsulado que se mostrará de forma segura dentro del nuevo st.iframe
         html_button = f"""
-        <button onclick="window.parent.location.href='{url_login_google}'" style="
-            width: 100%;
-            background-color: #ff4b4b;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
-            transition: 0.3s;
-        " onmouseover="this.style.backgroundColor='#e04040'" onmouseout="this.style.backgroundColor='#ff4b4b'">
-            🔴 Iniciar Sesión con Google
-        </button>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ margin: 0; padding: 0; overflow: hidden; }}
+                .btn {{
+                    width: 100%;
+                    background-color: #ff4b4b;
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    font-family: sans-serif;
+                    box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
+                    transition: 0.3s;
+                    text-align: center;
+                }}
+                .btn:hover {{ background-color: #e04040; }}
+            </style>
+        </head>
+        <body>
+            <button class="btn" onclick="window.parent.location.href='{url_login_google}'">
+                🔴 Iniciar Sesión con Google
+            </button>
+        </body>
+        </html>
         """
-        components.html(html_button, height=60)
+        # 🔥 CORRECCIÓN CLAVE: Usamos st.iframe en cumplimiento con la nueva sintaxis para incrustar el HTML
+        st.iframe(f"data:text/html;charset=utf-8,{urllib.parse.quote(html_button)}", height=65)
 
 # =========================================================================
 # APLICACIÓN PRINCIPAL (ACCESIBLE TRAS LOGUEARSE)
@@ -202,10 +216,3 @@ else:
             df_p_show["Peso Corporal (kg)"] = pd.to_numeric(df_p_show["Peso Corporal (kg)"], errors='coerce')
             df_p_show = df_p_show.sort_values(by="Fecha")
             
-            fig_p = px.line(df_p_show, x="Fecha", y="Peso Corporal (kg)", markers=True, title="Evolución del Peso Real vs Meta")
-            fig_p.add_hline(y=65.5, line_dash="dash", line_color="green", annotation_text="Meta (65-66 kg)")
-            st.plotly_chart(fig_p, use_container_width=True)
-            st.dataframe(df_p_show, use_container_width=True, hide_index=True)
-        else:
-            st.info("Sincronizando registros con la nube... Si ya guardaste datos, refresca la página.")
-
