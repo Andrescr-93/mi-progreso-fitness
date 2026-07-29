@@ -21,7 +21,6 @@ if not st.session_state.autenticado:
     st.markdown("<h4 style='text-align: center; color: gray;'>Registra tu peso y sobrecarga progresiva de forma segura en la nube</h4>", unsafe_allow_html=True)
     st.divider()
     
-    # CORRECCIÓN AQUÍ: Se añade el número 3 dentro de st.columns()
     col_l1, col_l2, col_l3 = st.columns(3)
     with col_l2:
         st.info("Para proteger tu privacidad y sincronizar tus datos con Google Sheets, por favor introduce tu correo autorizado.")
@@ -55,7 +54,9 @@ else:
     opcion = st.sidebar.radio("Selecciona una sección:", ["📉 Control de Peso Corporal", "🏋️ Récords de Fuerza Gym"])
 
     SPREADSHEET_ID = "1hZuLJED8zV7y4VvQ_D6oewPjaGd1lijnbo4rznzo82Q"
-    SCRIPT_URL = st.secrets.get("stein_url", "")
+    
+    # URL FIJA ASIGNADA DIRECTAMENTE PARA EVITAR ERRORES DE SECRETS
+    SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzH4Cmjq12LHH4MbzYQ9uAkWH2u_qdcAdu7170N45CeUAfBtMqVIgByBji-nYZJ8yrJ_Q/exec"
 
     # Intentar leer los datos históricos de Google Sheets de forma pública
     try:
@@ -79,7 +80,7 @@ else:
         fecha_actual = datetime.date.today()
         fecha_meta = datetime.date(2026, 12, 1)
         dias_restantes = (fecha_meta - fecha_actual).days
-        col3.metric(label="Días para la Meta", value=f"{max(0, dias_restantes)} dias")
+        col3.metric(label="Días para la Meta", value=f"{max(0, dias_restantes)} días")
         
         st.divider()
         
@@ -114,7 +115,7 @@ else:
                 else:
                     st.error("Error al conectar con el script de Google. Verifica la configuración.")
             else:
-                st.error("Falta configurar la variable 'stein_url' en tus Secrets de Streamlit.")
+                st.error("Falta configurar la variable SCRIPT_URL en el código.")
 
         if not df_p_show.dropna(how='all').empty:
             df_p_show["Peso Corporal (kg)"] = pd.to_numeric(df_p_show["Peso Corporal (kg)"], errors='coerce')
@@ -161,7 +162,7 @@ else:
                 else:
                     st.error("Error al conectar con el script de Google. Verifica la configuración.")
             else:
-                st.error("Falta configurar la variable 'stein_url' en tus Secrets de Streamlit.")
+                st.error("Falta configurar la variable SCRIPT_URL en el código.")
 
         if not df_g_show.dropna(how='all').empty:
             st.subheader("📊 Historial General de Levantamientos")
