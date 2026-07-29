@@ -6,11 +6,11 @@ import requests
 import urllib.parse
 
 # =========================================================================
-# CONFIGURACIÓN INICIAL Y CREDENCIALES DE GOOGLE
+# CONFIGURACIÓN INICIAL Y CREDENCIALES DESDE SECRETS
 # =========================================================================
 st.set_page_config(page_title="PowerFitness - Peso & Sobrecarga", page_icon="💪", layout="wide")
 
-# Lectura segura desde tus Secrets en Streamlit Cloud
+# Lectura cifrada y segura desde tus Secrets en Streamlit Cloud
 CLIENT_ID = st.secrets["google_oauth"]["client_id"]
 CLIENT_SECRET = st.secrets["google_oauth"]["client_secret"]
 
@@ -23,7 +23,7 @@ if "autenticado" not in st.session_state:
 if "user_email" not in st.session_state:
     st.session_state.user_email = None
 
-# DETECCIÓN AUTOMÁTICA DE LA URL ACTUAL DE LA APP
+# DETECCIÓN AUTOMÁTICA DE LA URL ACTUAL (Local o Nube)
 headers = st.context.headers
 host = headers.get("Host", "localhost:8501")
 is_https = "https" in headers.get("X-Forwarded-Proto", "")
@@ -33,13 +33,13 @@ redirect_uri = f"{protocol}://{host}/"
 # =========================================================================
 # PROCESAR RETORNO DE GOOGLE OAUTH (CAPTURA DE CODE)
 # =========================================================================
-# Cuando Google regresa a nuestra app, nos da un parámetro '?code=...' en la URL
+# Detecta si venimos redirigidos de Google con el parámetro '?code=...'
 query_params = st.query_params
 
 if "code" in query_params and not st.session_state.autenticado:
     codigo_autorizacion = query_params["code"]
     
-    # Intercambiar el código por un token de acceso definitivo
+    # Intercambiar el código temporal por un token de acceso
     payload_token = {
         "code": codigo_autorizacion,
         "client_id": CLIENT_ID,
@@ -53,7 +53,7 @@ if "code" in query_params and not st.session_state.autenticado:
     if token_response.status_code == 200:
         access_token = token_response.json().get("access_token")
         
-        # Consultar los datos del usuario con el token obtenido
+        # Consultar la información del perfil del usuario
         userinfo_response = requests.get(
             "https://googleapis.com",
             headers={"Authorization": f"Bearer {access_token}"}
@@ -68,7 +68,7 @@ if "code" in query_params and not st.session_state.autenticado:
                 st.session_state.autenticado = True
                 st.session_state.user_email = email_detectado
                 st.session_state.user_name = user_info.get("name", "Edwin")
-                # Limpiar los parámetros de la URL para estética
+                # Limpiar los parámetros de la URL para dejarla limpia
                 st.query_params.clear()
                 st.rerun()
             else:
@@ -90,7 +90,7 @@ if not st.session_state.autenticado:
     with col_l2:
         st.info("Para acceder a tus paneles y sincronizar con Google Sheets, inicia sesión con tu cuenta de Google.")
         
-        # CONSTRUCCIÓN DE LA URL OFICIAL DE AUTENTICACIÓN
+        # CONSTRUCCIÓN DE LA URL DE AUTENTICACIÓN
         parametros_google = {
             "client_id": CLIENT_ID,
             "redirect_uri": redirect_uri,
@@ -100,22 +100,15 @@ if not st.session_state.autenticado:
         }
         url_login_google = f"https://google.com?{urllib.parse.urlencode(parametros_google)}"
         
-        # Botón estilizado nativo que abre el flujo real de Google en la misma pestaña
-        st.markdown(
-            f'<a href="{url_login_google}" target="_self" style="text-decoration: none;">'
-            f'<div style="background-color: #ffffff; color: #757575; border: 1px solid #e0e0e0; '
-            f'padding: 10px 24px; border-radius: 4px; font-size: 16px; font-weight: 500; '
-            f'display: flex; align-items: center; justify-content: center; cursor: pointer; gap: 12px; text-align: center;">'
-            f'<img src="https://wikimedia.org" style="width: 20px; height: 20px;"/>'
-            f'Continuar con Google'
-            f'</div></a>',
-            unsafe_allow_html=True
-        )
+        # 🔥 BOTÓN CORREGIDO: Fuerza la navegación completa en la pestaña principal evitando bloqueos de iframe
+        if st.button("🔴 Continuar con Google", use_container_width=True):
+            st.markdown(f'<meta http-equiv="refresh" content="0; url={url_login_google}">', unsafe_allow_html=True)
 
 # =========================================================================
 # APLICACIÓN PRINCIPAL (ACCESIBLE TRAS LOGUEARSE)
 # =========================================================================
 else:
+    # Barra lateral de usuario
     st.sidebar.markdown(f"### ¡Hola, **{st.session_state.user_name}**! 👋")
     st.sidebar.caption(st.session_state.user_email)
     
@@ -128,6 +121,7 @@ else:
     st.sidebar.divider()
     opcion = st.sidebar.radio("Navegación del Tracker:", ["📉 Control de Peso Corporal", "🏋️ Récords de Fuerza Gym"])
 
+    # Descargar bases de datos históricas de Google Sheets de manera pública
     try:
         df_p_show = pd.read_csv(f"https://google.com{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=PesoCorporal")
         df_g_show = pd.read_csv(f"https://google.com{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=R%C3%A9cordsGym")
@@ -187,6 +181,7 @@ else:
                 except Exception as ex:
                     st.error(f"Error de red: {ex}")
 
+        # Graficar peso histórico
         df_p_show = df_p_show.dropna(subset=["Fecha", "Peso Corporal (kg)"], how="any")
         if not df_p_show.empty:
             df_p_show["Peso Corporal (kg)"] = pd.to_numeric(df_p_show["Peso Corporal (kg)"], errors='coerce')
@@ -199,3 +194,8 @@ else:
         else:
             st.info("Sincronizando registros con la nube... Si ya guardaste datos, refresca la página.")
 
+    # =========================================================================
+    # SECCIÓN 2: RÉCORDS DEL GIMNASIO
+    # =========================================================================
+    elif opcion == "🏋️ Récords de Fuerza Gym":
+        st.subheader("🏋️ Registro de Sobrecarga Progresiva")
