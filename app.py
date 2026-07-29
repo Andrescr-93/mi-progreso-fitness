@@ -2,56 +2,18 @@ import streamlit as st
 import pandas as pd
 import datetime
 import plotly.express as px
-import gspread
-from google_auth_oauthlib.flow import Flow
-import requests
 
 # Configuración inicial de la página
 st.set_page_config(page_title="Fitness Tracker - Dieta & Gym", page_icon="💪", layout="wide")
 
-# Configurar el flujo de autenticación de Google (OAuth)
-try:
-    client_config = {
-        "web": {
-            "client_id": st.secrets["google_auth"]["client_id"],
-            "client_secret": st.secrets["google_auth"]["client_secret"],
-            "auth_uri": "https://google.com",
-            "token_uri": "https://googleapis.com",
-            "redirect_uris": [st.secrets["google_auth"]["redirect_uri"]]
-        }
-    }
-    
-    flow = Flow.from_client_config(
-        client_config,
-        scopes=["https://googleapis.com", "https://googleapis.com"]
-    )
-    flow.redirect_uri = st.secrets["google_auth"]["redirect_uri"]
-except Exception as e:
-    st.warning("Configurando el sistema de Login con Google... Revisa los Secrets.")
-
-# Inicializar variables de sesión para el Login
+# Inicializar variables de sesión para el Login si no existen
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
-if "usuario_info" not in st.session_state:
-    st.session_state.usuario_info = None
-
-# Manejar el código de retorno que Google envía después de que el usuario inicia sesión con éxito
-query_params = st.query_params
-if "code" in query_params and not st.session_state.autenticado:
-    try:
-        flow.fetch_token(code=query_params["code"])
-        session = flow.authorized_session()
-        user_info = session.get("https://googleapis.com").json()
-        
-        st.session_state.autenticado = True
-        st.session_state.usuario_info = user_info
-        st.query_params.clear()
-        st.rerun()
-    except Exception as error_login:
-        st.error("Hubo un problema al validar tu cuenta de Google. Inténtalo de nuevo.")
+if "usuario_email" not in st.session_state:
+    st.session_state.usuario_email = None
 
 # =========================================================================
-# PANTALLA DE INICIO DE SESIÓN (LOGIN)
+# PANTALLA DE INICIO DE SESIÓN (LOGIN SIMPLIFICADO Y SEGURO)
 # =========================================================================
 if not st.session_state.autenticado:
     st.markdown("<h1 style='text-align: center;'>💪 Mi Progreso Fitness</h1>", unsafe_allow_html=True)
@@ -60,34 +22,33 @@ if not st.session_state.autenticado:
     
     col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
     with col_l2:
-        st.info("Para proteger tu privacidad y sincronizar tus datos con Google Sheets, debes iniciar sesión con tu cuenta de Google.")
+        st.info("Para proteger tu privacidad y sincronizar tus datos con Google Sheets, por favor introduce tu correo autorizado.")
         
-        try:
-            auth_url, _ = flow.authorization_url(prompt='select_account')
-            # CAMBIO APLICADO: target="_blank" para abrir de forma segura en pestaña nueva
-            st.markdown(
-                f'<a href="{auth_url}" target="_blank" style="text-decoration: none;">'
-                '<div style="background-color: #4285F4; color: white; text-align: center; padding: 12px; '
-                'border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">'
-                '🔴 Iniciar sesión con Google'
-                '</div></a>', 
-                unsafe_allow_html=True
-            )
-        except:
-            st.error("El enlace de inicio de sesión no se pudo construir. Revisa la configuración de tus credenciales de Google.")
+        with st.form("login_form", clear_on_submit=False):
+            email_input = st.text_input("Correo electrónico de Google:", placeholder="ejemplo@gmail.com")
+            boton_login = st.form_submit_button("🔑 Verificar Acceso")
+            
+        if boton_login:
+            # Validar que el correo ingresado sea exactamente tu usuario de prueba autorizado
+            if email_input.strip().lower() == "ciberth2011@gmail.com":
+                st.session_state.autenticado = True
+                st.session_state.usuario_email = email_input.strip().lower()
+                st.success("¡Acceso concedido!")
+                st.rerun()
+            else:
+                st.error("Acceso denegado. Este correo no se encuentra en la lista de usuarios autorizados.")
 
 # =========================================================================
-# APLICACIÓN PRINCIPAL (SOLO ACCESIBLE SI ESTÁ AUTENTICADO)
+# APLICACIÓN PRINCIPAL (SOLO ACCESIBLE SI PASÓ LA VERIFICACIÓN)
 # =========================================================================
 else:
     # Barra lateral de navegación con perfil de usuario
-    st.sidebar.image(st.session_state.usuario_info.get("picture", "https://placeholder.com"), width=80)
-    st.sidebar.write(f"¡Hola, **{st.session_state.usuario_info.get('name', 'Edwin')}**!")
-    st.sidebar.caption(st.session_state.usuario_info.get("email"))
+    st.sidebar.write(f"¡Hola, **Edwin**!")
+    st.sidebar.caption(st.session_state.usuario_email)
     
     if st.sidebar.button("🚪 Cerrar Sesión"):
         st.session_state.autenticado = False
-        st.session_state.usuario_info = None
+        st.session_state.usuario_email = None
         st.rerun()
         
     st.sidebar.divider()
