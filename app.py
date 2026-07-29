@@ -13,7 +13,7 @@ if "usuario_email" not in st.session_state:
     st.session_state.usuario_email = None
 
 # =========================================================================
-# PANTALLA DE INICIO DE SESIÓN (LOGIN SIMPLIFICADO Y SEGURO)
+# PANTALLA DE INICIO DE SESIÓN (LOGIN)
 # =========================================================================
 if not st.session_state.autenticado:
     st.markdown("<h1 style='text-align: center;'>💪 Mi Progreso Fitness</h1>", unsafe_allow_html=True)
@@ -29,7 +29,6 @@ if not st.session_state.autenticado:
             boton_login = st.form_submit_button("🔑 Verificar Acceso")
             
         if boton_login:
-            # Validar que el correo ingresado sea exactamente tu usuario de prueba autorizado
             if email_input.strip().lower() == "ciberth2011@gmail.com":
                 st.session_state.autenticado = True
                 st.session_state.usuario_email = email_input.strip().lower()
@@ -42,7 +41,6 @@ if not st.session_state.autenticado:
 # APLICACIÓN PRINCIPAL (SOLO ACCESIBLE SI PASÓ LA VERIFICACIÓN)
 # =========================================================================
 else:
-    # Barra lateral de navegación con perfil de usuario
     st.sidebar.write(f"¡Hola, **Edwin**!")
     st.sidebar.caption(st.session_state.usuario_email)
     
@@ -56,6 +54,7 @@ else:
 
     SPREADSHEET_ID = "1hZuLJED8zV7y4VvQ_D6oewPjaGd1lijnbo4rznzo82Q"
 
+    # Intentar leer los datos históricos de Google Sheets de forma pública
     try:
         df_p_show = pd.read_csv(f"https://google.com{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=PesoCorporal")
         df_g_show = pd.read_csv(f"https://google.com{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=R%C3%A9cordsGym")
@@ -63,6 +62,9 @@ else:
         df_p_show = pd.DataFrame(columns=["Fecha", "Peso Corporal (kg)", "Variación Semanal (kg)", "Notas"])
         df_g_show = pd.DataFrame(columns=["Fecha", "Ejercicio", "Peso Levantado (lbs/kg)", "Repeticiones", "RPE (Esfuerzo 1-10)"])
 
+    # =========================================================================
+    # PANTALLA 1: PESO CORPORAL
+    # =========================================================================
     if opcion == "📉 Control de Peso Corporal":
         st.subheader("📉 Pérdida de Peso Corporal")
         st.markdown("### Objetivo: Pérdida de grasa manteniendo masa muscular")
@@ -78,22 +80,50 @@ else:
         
         st.divider()
         
-        if not df_p_show.empty:
+        # FORMULARIO PARA REGISTRAR NUEVOS DATOS EN GOOGLE SHEETS
+        with st.form("formulario_peso", clear_on_submit=True):
+            st.subheader("📝 Registrar Peso en Ayunas")
+            fecha_w = st.date_input("Fecha de pesaje:", datetime.date.today(), key="fecha_peso")
+            peso_w = st.number_input("Peso (kg):", min_value=30.0, max_value=150.0, value=70.0, step=0.1, format="%.1f")
+            notas_w = st.text_input("Notas de la semana:", placeholder="Ej: Energía alta, buen descanso...")
+            boton_w = st.form_submit_button("💾 Guardar Peso Localmente")
+            
+        if boton_w:
+            st.success("¡Nota Importante!: Para habilitar la escritura remota en la nube desde el celular de forma gratuita, abre tu Google Sheets 'Informe' directamente e ingresa tus datos en las filas. El sistema los graficará de forma automática aquí.")
+
+        if not df_p_show.dropna(how='all').empty:
             df_p_show["Peso Corporal (kg)"] = pd.to_numeric(df_p_show["Peso Corporal (kg)"], errors='coerce')
             fig_p = px.line(df_p_show, x="Fecha", y="Peso Corporal (kg)", markers=True, title="Evolución del Peso Real vs Meta")
             fig_p.add_hline(y=65.5, line_dash="dash", line_color="green", annotation_text="Meta (65-66 kg)")
             st.plotly_chart(fig_p, use_container_width=True)
             st.dataframe(df_p_show, use_container_width=True, hide_index=True)
         else:
-            st.info("No hay registros en la nube todavía en la hoja 'PesoCorporal'.")
+            st.info("No hay registros en la nube todavía en la hoja 'PesoCorporal'. ¡Prueba agregando una fila con tu peso actual en tu archivo de Google Sheets 'Informe' para ver cómo se dibuja tu gráfica aquí!")
 
+    # =========================================================================
+    # PANTALLA 2: RÉCORDS DEL GIMNASIO
+    # =========================================================================
     elif opcion == "🏋️ Récords de Fuerza Gym":
         st.subheader("🏋️ Registro de Sobrecarga Progresiva")
         st.markdown("### Objetivo: Subir la fuerza en el gimnasio para evitar perder músculo en el déficit")
         
         st.divider()
         
-        if not df_g_show.empty:
+        with st.form("formulario_gym", clear_on_submit=True):
+            st.subheader("💪 Registrar Serie Pesada")
+            fecha_g = st.date_input("Fecha del entrenamiento:", datetime.date.today(), key="fecha_gym")
+            ejercicio_g = st.selectbox("Selecciona el Ejercicio:", ["Press de Banca (Pecho)", "Sentadilla Libre (Pierna)", "Peso Muerto (Espalda/Glúteo)", "Press Militar (Hombro)", "Dominadas / Polea Alta", "Curl de Bíceps", "Extensión de Tríceps"])
+            
+            col_g1, col_g2, col_g3 = st.columns(3)
+            peso_g = col_g1.number_input("Peso Levantado:", min_value=0.0, max_value=500.0, value=20.0, step=0.5, format="%.1f")
+            reps_g = col_g2.number_input("Repeticiones logradas:", min_value=1, max_value=50, value=10, step=1)
+            rpe_g = col_g3.slider("Nivel de Esfuerzo (RPE 1-10):", min_value=1, max_value=10, value=8)
+            boton_g = st.form_submit_button("💾 Guardar Serie")
+            
+        if boton_g:
+            st.info("Los datos históricos se leen directamente de tu Google Sheets. Abre tu archivo 'Informe' en Drive para rellenar tus récords.")
+
+        if not df_g_show.dropna(how='all').empty:
             st.subheader("📊 Historial General de Levantamientos")
             st.dataframe(df_g_show, use_container_width=True, hide_index=True)
             
