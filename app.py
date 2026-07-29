@@ -41,6 +41,7 @@ query_params = st.query_params
 if "code" in query_params and not st.session_state.autenticado:
     codigo_autorizacion = query_params["code"]
     
+    # Intercambiar el código por un token de acceso definitivo
     payload_token = {
         "code": codigo_autorizacion,
         "client_id": CLIENT_ID,
@@ -54,6 +55,7 @@ if "code" in query_params and not st.session_state.autenticado:
     if token_response.status_code == 200:
         access_token = token_response.json().get("access_token")
         
+        # Consultar los datos del usuario con el token obtenido
         userinfo_response = requests.get(
             "https://googleapis.com",
             headers={"Authorization": f"Bearer {access_token}"}
@@ -63,6 +65,7 @@ if "code" in query_params and not st.session_state.autenticado:
             user_info = userinfo_response.json()
             email_detectado = user_info.get("email", "").lower()
             
+            # Filtro estricto de seguridad para tu correo autorizado
             if email_detectado == "ciberth2011@gmail.com":
                 st.session_state.autenticado = True
                 st.session_state.user_email = email_detectado
@@ -76,11 +79,10 @@ if "code" in query_params and not st.session_state.autenticado:
     else:
         st.error("El código de autorización de Google expiró o es inválido. Intenta de nuevo.")
 
-
 # =========================================================================
-# FUNCIÓN: VISTA DE INICIO DE SESIÓN
+# PANTALLA DE INICIO DE SESIÓN (LOGIN UI)
 # =========================================================================
-def mostrar_pantalla_login():
+if not st.session_state.autenticado:
     st.markdown("<h1 style='text-align: center; margin-top: 50px;'>💪 PowerFitness Tracker</h1>", unsafe_allow_html=True)
     st.markdown("<h4 style='text-align: center; color: gray;'>Gestiona tu composición corporal y récords de fuerza de forma segura</h4>", unsafe_allow_html=True)
     st.write("---")
@@ -89,6 +91,7 @@ def mostrar_pantalla_login():
     with col_l2:
         st.info("Para acceder a tus paneles y sincronizar con Google Sheets, inicia sesión con tu cuenta de Google.")
         
+        # CONSTRUCCIÓN DE LA URL OFICIAL DE AUTENTICACIÓN
         parametros_google = {
             "client_id": CLIENT_ID,
             "redirect_uri": redirect_uri,
@@ -98,7 +101,7 @@ def mostrar_pantalla_login():
         }
         url_login_google = f"{AUTHORIZE_URL}?{urllib.parse.urlencode(parametros_google)}"
         
-        # HTML limpio embebido para ejecutar redirección del navegador del usuario sin bloquear el backend
+        # HTML encapsulado que se mostrará dentro del st.iframe para evitar bloqueos
         html_button = f"""
         <!DOCTYPE html>
         <html>
@@ -132,11 +135,10 @@ def mostrar_pantalla_login():
         """
         st.iframe(f"data:text/html;charset=utf-8,{urllib.parse.quote(html_button)}", height=65)
 
-
 # =========================================================================
-# FUNCIÓN: VISTA DE LA APLICACIÓN PRINCIPAL
+# APLICACIÓN PRINCIPAL (ACCESIBLE TRAS LOGUEARSE)
 # =========================================================================
-def mostrar_aplicacion_principal():
+else:
     st.sidebar.markdown(f"### ¡Hola, **{st.session_state.user_name}**! 👋")
     st.sidebar.caption(st.session_state.user_email)
     
@@ -156,7 +158,9 @@ def mostrar_aplicacion_principal():
         df_p_show = pd.DataFrame(columns=["Fecha", "Peso Corporal (kg)", "Variación Semanal (kg)", "Notas"])
         df_g_show = pd.DataFrame(columns=["Fecha", "Ejercicio", "Peso Levantado (lbs/kg)", "Repeticiones", "RPE (Esfuerzo 1-10)"])
 
-    # PANTALLA 1: PESO CORPORAL
+    # =========================================================================
+    # SECCIÓN 1: PESO CORPORAL
+    # =========================================================================
     if opcion == "📉 Control de Peso Corporal":
         st.subheader("📉 Pérdida de Peso Corporal")
         st.markdown("### Objetivo: Pérdida de grasa manteniendo masa muscular")
@@ -212,11 +216,3 @@ def mostrar_aplicacion_principal():
             df_p_show = df_p_show.sort_values(by="Fecha")
             
             fig_p = px.line(df_p_show, x="Fecha", y="Peso Corporal (kg)", markers=True, title="Evolución del Peso Real vs Meta")
-            fig_p.add_hline(y=65.5, line_dash="dash", line_color="green", annotation_text="Meta (65-66 kg)")
-            st.plotly_chart(fig_p, use_container_width=True)
-            st.dataframe(df_p_show, use_container_width=True, hide_index=True)
-        else:
-            st.info("Sincronizando registros con la nube... Si ya guardaste datos, refresca la página.")
-
-    # PANTALLA 2: RÉCORDS DEL GIMNASIO
-
