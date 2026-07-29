@@ -38,6 +38,7 @@ query_params = st.query_params
 if "code" in query_params and not st.session_state.autenticado:
     codigo_autorizacion = query_params["code"]
     
+    # Intercambiar el código por un token de acceso definitivo
     payload_token = {
         "code": codigo_autorizacion,
         "client_id": CLIENT_ID,
@@ -51,6 +52,7 @@ if "code" in query_params and not st.session_state.autenticado:
     if token_response.status_code == 200:
         access_token = token_response.json().get("access_token")
         
+        # Consultar los datos del usuario con el token obtenido
         userinfo_response = requests.get(
             "https://googleapis.com",
             headers={"Authorization": f"Bearer {access_token}"}
@@ -60,6 +62,7 @@ if "code" in query_params and not st.session_state.autenticado:
             user_info = userinfo_response.json()
             email_detectado = user_info.get("email", "").lower()
             
+            # Filtro estricto de seguridad para tu correo autorizado
             if email_detectado == "ciberth2011@gmail.com":
                 st.session_state.autenticado = True
                 st.session_state.user_email = email_detectado
@@ -85,7 +88,7 @@ if not st.session_state.autenticado:
     with col_l2:
         st.info("Para acceder a tus paneles y sincronizar con Google Sheets, inicia sesión con tu cuenta de Google.")
         
-        # CONSTRUCCIÓN DE LA URL OFICIAL DE AUTENTICACIÓN
+        # CONSTRUCCIÓN DE LA URL OFICIAL DE AUTENTICACIÓN (DIRECCIÓN CORREGIDA)
         parametros_google = {
             "client_id": CLIENT_ID,
             "redirect_uri": redirect_uri,
@@ -93,10 +96,19 @@ if not st.session_state.autenticado:
             "scope": "openid email profile",
             "access_type": "online"
         }
+        # 🔥 CORRECCIÓN CLAVE: Agregada la palabra '/auth' a la URL oficial de Google
         url_login_google = f"https://google.com?{urllib.parse.urlencode(parametros_google)}"
         
-        # 🔥 SOLUCIÓN DEFINITIVA: Botón de enlace nativo de Streamlit que abre externamente sin iframes
-        st.link_button("🔴 Iniciar Sesión con Google", url_login_google, use_container_width=True)
+        # 🔥 CORRECCIÓN CLAVE: Enlace HTML con target="_top" para romper el iframe e ir a la ventana completa
+        st.markdown(
+            f'<a href="{url_login_google}" target="_top" style="text-decoration: none;">'
+            f'<div style="background-color: #f44336; color: #ffffff; border: 1px solid #d32f2f; '
+            f'padding: 12px 24px; border-radius: 4px; font-size: 16px; font-weight: bold; '
+            f'display: flex; align-items: center; justify-content: center; cursor: pointer; gap: 12px; text-align: center; width: 100%;">'
+            f'🔴 Iniciar Sesión con Google'
+            f'</div></a>',
+            unsafe_allow_html=True
+        )
 
 # =========================================================================
 # APLICACIÓN PRINCIPAL (ACCESIBLE TRAS LOGUEARSE)
@@ -169,7 +181,7 @@ else:
                         st.success("¡Peso guardado exitosamente!")
                         st.rerun()
                     else:
-                        st.error(f"Error en communication. Código: {response.status_code}")
+                        st.error(f"Error en comunicación. Código: {response.status_code}")
                 except Exception as ex:
                     st.error(f"Error de red: {ex}")
 
@@ -187,14 +199,3 @@ else:
 
     # =========================================================================
     # SECCIÓN 2: RÉCORDS DEL GIMNASIO
-    # =========================================================================
-    elif opcion == "🏋️ Récords de Fuerza Gym":
-        st.subheader("🏋️ Registro de Sobrecarga Progresiva")
-        st.markdown("### Objetivo: Subir la fuerza en el gimnasio para evitar perder músculo en el déficit")
-        
-        st.divider()
-        
-        with st.form("formulario_gym", clear_on_submit=True):
-            st.subheader("💪 Registrar Serie Pesada")
-            fecha_g = st.date_input("Fecha del entrenamiento:", datetime.date.today(), key="fecha_gym")
-            ejercicio_g = st.selectbox("Selecciona el Ejercicio:", ["Press de Banca (Pecho)", "Sentadilla Libre (Pierna)", "Peso Muerto (Espalda/Glúteo)", "Press Militar (Hombro)", "Dominadas / Polea Alta", "Curl de Bíceps", "Extensión de Tríceps"])
