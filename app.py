@@ -21,7 +21,8 @@ if not st.session_state.autenticado:
     st.markdown("<h4 style='text-align: center; color: gray;'>Registra tu peso y sobrecarga progresiva de forma segura en la nube</h4>", unsafe_allow_html=True)
     st.divider()
     
-    col_l1, col_l2, col_l3 = st.columns()
+    # CORRECCIÓN AQUÍ: Se añade el número 3 dentro de st.columns()
+    col_l1, col_l2, col_l3 = st.columns(3)
     with col_l2:
         st.info("Para proteger tu privacidad y sincronizar tus datos con Google Sheets, por favor introduce tu correo autorizado.")
         
@@ -78,11 +79,10 @@ else:
         fecha_actual = datetime.date.today()
         fecha_meta = datetime.date(2026, 12, 1)
         dias_restantes = (fecha_meta - fecha_actual).days
-        col3.metric(label="Días para la Meta", value=f"{max(0, dias_restantes)} días")
+        col3.metric(label="Días para la Meta", value=f"{max(0, dias_restantes)} dias")
         
         st.divider()
         
-        # FORMULARIO PARA REGISTRAR NUEVOS DATOS EN GOOGLE SHEETS
         with st.form("formulario_peso", clear_on_submit=True):
             st.subheader("📝 Registrar Peso en Ayunas")
             fecha_w = st.date_input("Fecha de pesaje:", datetime.date.today(), key="fecha_peso")
@@ -92,7 +92,6 @@ else:
             
         if boton_w:
             if SCRIPT_URL:
-                # Calcular variación automática con el registro anterior
                 variacion = 0.0
                 if not df_p_show.dropna(how='all').empty:
                     try:
@@ -101,7 +100,6 @@ else:
                     except:
                         pass
                 
-                # Formato JSON optimizado para Apps Script
                 datos_enviar = {
                     "Fecha": str(fecha_w),
                     "Peso Corporal (kg)": str(peso_w),
