@@ -101,7 +101,7 @@ else:
                     except:
                         pass
                 
-                # Formato JSON optimizado para Apps Script (Objeto único directo sin [])
+                # Formato JSON optimizado para Apps Script
                 datos_enviar = {
                     "Fecha": str(fecha_w),
                     "Peso Corporal (kg)": str(peso_w),
@@ -109,7 +109,6 @@ else:
                     "Notas": str(notas_w)
                 }
                 
-                # Envío POST directo a la API de tu Google Script
                 response = requests.post(SCRIPT_URL, json=datos_enviar)
                 if response.status_code == 200:
                     st.success("¡Peso guardado exitosamente en tu Google Sheets en la nube!")
@@ -150,7 +149,6 @@ else:
             
         if boton_g:
             if SCRIPT_URL:
-                # Formato JSON optimizado para la pestaña de Gym en Apps Script
                 datos_enviar_g = {
                     "Fecha": str(fecha_g),
                     "Ejercicio": str(ejercicio_g),
@@ -179,4 +177,4 @@ else:
             fig_g = px.line(df_filtrado, x="Fecha", y="Peso Levantado (lbs/kg)", markers=True, text="Repeticiones", title=f"Evolución de Carga en: {ejercicio_filtro}")
             st.plotly_chart(fig_g, use_container_width=True)
         else:
-
+            st.info("No hay registros en la nube todavía en la hoja 'RécordsGym'.")
