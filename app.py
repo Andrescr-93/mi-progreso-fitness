@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import datetime
 import plotly.express as px
+import requests
 
 # Configuración inicial de la página
 st.set_page_config(page_title="Fitness Tracker - Dieta & Gym", page_icon="💪", layout="wide")
@@ -20,7 +21,7 @@ if not st.session_state.autenticado:
     st.markdown("<h4 style='text-align: center; color: gray;'>Registra tu peso y sobrecarga progresiva de forma segura en la nube</h4>", unsafe_allow_html=True)
     st.divider()
     
-    col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
+    col_l1, col_l2, col_l3 = st.columns()
     with col_l2:
         st.info("Para proteger tu privacidad y sincronizar tus datos con Google Sheets, por favor introduce tu correo autorizado.")
         
@@ -53,6 +54,7 @@ else:
     opcion = st.sidebar.radio("Selecciona una sección:", ["📉 Control de Peso Corporal", "🏋️ Récords de Fuerza Gym"])
 
     SPREADSHEET_ID = "1hZuLJED8zV7y4VvQ_D6oewPjaGd1lijnbo4rznzo82Q"
+    SCRIPT_URL = st.secrets.get("stein_url", "")
 
     # Intentar leer los datos históricos de Google Sheets de forma pública
     try:
@@ -84,12 +86,38 @@ else:
         with st.form("formulario_peso", clear_on_submit=True):
             st.subheader("📝 Registrar Peso en Ayunas")
             fecha_w = st.date_input("Fecha de pesaje:", datetime.date.today(), key="fecha_peso")
-            peso_w = st.number_input("Peso (kg):", min_value=30.0, max_value=150.0, value=70.0, step=0.1, format="%.1f")
+            peso_w = st.number_input("Peso (kg):", min_value=30.0, max_value=150.0, value=76.0, step=0.1, format="%.1f")
             notas_w = st.text_input("Notas de la semana:", placeholder="Ej: Energía alta, buen descanso...")
-            boton_w = st.form_submit_button("💾 Guardar Peso Localmente")
+            boton_w = st.form_submit_button("🚀 Guardar Peso en Google Sheets")
             
         if boton_w:
-            st.success("¡Nota Importante!: Para habilitar la escritura remota en la nube desde el celular de forma gratuita, abre tu Google Sheets 'Informe' directamente e ingresa tus datos en las filas. El sistema los graficará de forma automática aquí.")
+            if SCRIPT_URL:
+                # Calcular variación automática con el registro anterior
+                variacion = 0.0
+                if not df_p_show.dropna(how='all').empty:
+                    try:
+                        ultimo_peso = float(df_p_show.dropna(how='all').iloc[-1]["Peso Corporal (kg)"])
+                        variacion = round(peso_w - ultimo_peso, 2)
+                    except:
+                        pass
+                
+                # Formato JSON optimizado para Apps Script (Objeto único directo sin [])
+                datos_enviar = {
+                    "Fecha": str(fecha_w),
+                    "Peso Corporal (kg)": str(peso_w),
+                    "Variación Semanal (kg)": str(variacion),
+                    "Notas": str(notas_w)
+                }
+                
+                # Envío POST directo a la API de tu Google Script
+                response = requests.post(SCRIPT_URL, json=datos_enviar)
+                if response.status_code == 200:
+                    st.success("¡Peso guardado exitosamente en tu Google Sheets en la nube!")
+                    st.rerun()
+                else:
+                    st.error("Error al conectar con el script de Google. Verifica la configuración.")
+            else:
+                st.error("Falta configurar la variable 'stein_url' en tus Secrets de Streamlit.")
 
         if not df_p_show.dropna(how='all').empty:
             df_p_show["Peso Corporal (kg)"] = pd.to_numeric(df_p_show["Peso Corporal (kg)"], errors='coerce')
@@ -98,7 +126,7 @@ else:
             st.plotly_chart(fig_p, use_container_width=True)
             st.dataframe(df_p_show, use_container_width=True, hide_index=True)
         else:
-            st.info("No hay registros en la nube todavía en la hoja 'PesoCorporal'. ¡Prueba agregando una fila con tu peso actual en tu archivo de Google Sheets 'Informe' para ver cómo se dibuja tu gráfica aquí!")
+            st.info("No hay registros en la nube todavía en la hoja 'PesoCorporal'.")
 
     # =========================================================================
     # PANTALLA 2: RÉCORDS DEL GIMNASIO
@@ -118,10 +146,26 @@ else:
             peso_g = col_g1.number_input("Peso Levantado:", min_value=0.0, max_value=500.0, value=20.0, step=0.5, format="%.1f")
             reps_g = col_g2.number_input("Repeticiones logradas:", min_value=1, max_value=50, value=10, step=1)
             rpe_g = col_g3.slider("Nivel de Esfuerzo (RPE 1-10):", min_value=1, max_value=10, value=8)
-            boton_g = st.form_submit_button("💾 Guardar Serie")
+            boton_g = st.form_submit_button("🚀 Guardar Serie en Google Sheets")
             
         if boton_g:
-            st.info("Los datos históricos se leen directamente de tu Google Sheets. Abre tu archivo 'Informe' en Drive para rellenar tus récords.")
+            if SCRIPT_URL:
+                # Formato JSON optimizado para la pestaña de Gym en Apps Script
+                datos_enviar_g = {
+                    "Fecha": str(fecha_g),
+                    "Ejercicio": str(ejercicio_g),
+                    "Peso Levantado (lbs/kg)": str(peso_g),
+                    "Repeticiones": str(reps_g),
+                    "E1-10": str(rpe_g)
+                }
+                response = requests.post(SCRIPT_URL, json=datos_enviar_g)
+                if response.status_code == 200:
+                    st.success(f"¡Récord de {ejercicio_g} guardado en la nube con éxito!")
+                    st.rerun()
+                else:
+                    st.error("Error al conectar con el script de Google. Verifica la configuración.")
+            else:
+                st.error("Falta configurar la variable 'stein_url' en tus Secrets de Streamlit.")
 
         if not df_g_show.dropna(how='all').empty:
             st.subheader("📊 Historial General de Levantamientos")
@@ -135,5 +179,4 @@ else:
             fig_g = px.line(df_filtrado, x="Fecha", y="Peso Levantado (lbs/kg)", markers=True, text="Repeticiones", title=f"Evolución de Carga en: {ejercicio_filtro}")
             st.plotly_chart(fig_g, use_container_width=True)
         else:
-            st.info("No hay registros en la nube todavía en la hoja 'RécordsGym'.")
 
