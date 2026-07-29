@@ -20,8 +20,15 @@ TOKEN_URL = "https://googleapis.com"
 SPREADSHEET_ID = "1hZuLJED8zV7y4VvQ_D6oewPjaGd1lijnbo4rznzo82Q"
 SCRIPT_URL = "https://google.com"
 
-# Inicializar componente OAuth2 de Google
-oauth2 = OAuth2Component(CLIENT_ID, CLIENT_SECRET, AUTHORIZE_URL, TOKEN_URL, TOKEN_URL, "")
+# 🔥 CORRECCIÓN CLAVE: Inicialización explícita con argumentos por nombre para evitar desvíos de URL
+oauth2 = OAuth2Component(
+    client_id=CLIENT_ID,
+    client_secret=CLIENT_SECRET,
+    auth_url=AUTHORIZE_URL,
+    token_url=TOKEN_URL,
+    refresh_token_url=TOKEN_URL,
+    revoke_token_url="https://googleapis.com"
+)
 
 # Inicializar estados de la sesión si no existen
 if "autenticado" not in st.session_state:
@@ -60,7 +67,6 @@ if not st.session_state.autenticado:
         
         # Procesar el acceso tras un inicio de sesión exitoso
         if result and "token" in result:
-            # Saca de manera segura el correo del flujo sin requerir librerías extras de parseo de JWT
             access_token = result["token"]["access_token"]
             userinfo_response = requests.get(
                 "https://googleapis.com",
@@ -189,4 +195,3 @@ else:
             fecha_g = st.date_input("Fecha del entrenamiento:", datetime.date.today(), key="fecha_gym")
             ejercicio_g = st.selectbox("Selecciona el Ejercicio:", ["Press de Banca (Pecho)", "Sentadilla Libre (Pierna)", "Peso Muerto (Espalda/Glúteo)", "Press Militar (Hombro)", "Dominadas / Polea Alta", "Curl de Bíceps", "Extensión de Tríceps"])
             
-            col_g1, col_g2, col_g3 = st.columns(3)
