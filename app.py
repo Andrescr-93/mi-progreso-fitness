@@ -3,70 +3,108 @@ import pandas as pd
 import datetime
 import plotly.express as px
 import requests
+import jwt
+from streamlit_oauth import OAuth2Component
 
-# Configuración inicial de la página
-st.set_page_config(page_title="Fitness Tracker - Dieta & Gym", page_icon="💪", layout="wide")
+# =========================================================================
+# CONFIGURACIÓN INICIAL Y LLAMADO SEGURO A SECRETS
+# =========================================================================
+st.set_page_config(page_title="PowerFitness - Peso & Sobrecarga", page_icon="💪", layout="wide")
 
-# Inicializar variables de sesión para el Login si no existen
+# Lectura cifrada y segura desde tus Secrets configurados
+CLIENT_ID = st.secrets["google_oauth"]["client_id"]
+CLIENT_SECRET = st.secrets["google_oauth"]["client_secret"]
+
+AUTHORIZE_URL = "https://google.com"
+TOKEN_URL = "https://googleapis.com"
+
+SPREADSHEET_ID = "1hZuLJED8zV7y4VvQ_D6oewPjaGd1lijnbo4rznzo82Q"
+SCRIPT_URL = "https://google.com"
+
+# Inicializar componente OAuth2 de Google
+oauth2 = OAuth2Component(CLIENT_ID, CLIENT_SECRET, AUTHORIZE_URL, TOKEN_URL, TOKEN_URL, "")
+
+# Inicializar estados de la sesión si no existen
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
-if "usuario_email" not in st.session_state:
-    st.session_state.usuario_email = None
+if "user_email" not in st.session_state:
+    st.session_state.user_email = None
 
 # =========================================================================
-# PANTALLA DE INICIO DE SESIÓN (LOGIN)
+# PANTALLA DE INICIO DE SESIÓN CON GOOGLE
 # =========================================================================
 if not st.session_state.autenticado:
-    st.markdown("<h1 style='text-align: center;'>💪 Mi Progreso Fitness</h1>", unsafe_allow_html=True)
-    st.markdown("<h4 style='text-align: center; color: gray;'>Registra tu peso y sobrecarga progresiva de forma segura en la nube</h4>", unsafe_allow_html=True)
-    st.divider()
+    st.markdown("<h1 style='text-align: center; margin-top: 50px;'>💪 PowerFitness Tracker</h1>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align: center; color: gray;'>Gestiona tu composición corporal y récords de fuerza de forma segura</h4>", unsafe_allow_html=True)
+    st.write("---")
     
-    col_l1, col_l2, col_l3 = st.columns(3)
+    col_l1, col_l2, col_l3 = st.columns([1, 1.2, 1])
     with col_l2:
-        st.info("Para proteger tu privacidad y sincronizar tus datos con Google Sheets, por favor introduce tu correo autorizado.")
+        st.info("Para acceder a tus paneles y sincronizar con Google Sheets, inicia sesión con tu cuenta de Google.")
         
-        with st.form("login_form", clear_on_submit=False):
-            email_input = st.text_input("Correo electrónico de Google:", placeholder="ejemplo@gmail.com")
-            boton_login = st.form_submit_button("🔑 Verificar Acceso")
+        # 🌐 DETECCIÓN AUTOMÁTICA DE URL (Local o Nube)
+        # Extrae los encabezados HTTP del navegador para saber la URL exacta donde corre el app
+        headers = st.context.headers
+        host = headers.get("Host", "localhost:8501")
+        is_https = "https" in headers.get("X-Forwarded-Proto", "")
+        protocol = "https" if is_https else "http"
+        current_url = f"{protocol}://{host}/"
+        
+        # Renderizar el botón nativo de Google Sign-In
+        result = oauth2.authorize_button(
+            name="Continuar con Google",
+            icon="https://wikimedia.org",
+            redirect_uri=current_url,
+            scope="openid email profile",
+            key="google_auth",
+            use_container_width=True
+        )
+        
+        # Procesar el token devuelto tras un inicio de sesión exitoso
+        if result and "token" in result:
+            id_token = result["token"]["id_token"]
             
-        if boton_login:
-            if email_input.strip().lower() == "ciberth2011@gmail.com":
+            # Decodificar el token de forma segura sin verificar firma localmente (vía PyJWT)
+            payload = jwt.decode(id_token, options={"verify_signature": False})
+            email_detectado = payload.get("email", "").lower()
+            
+            # Filtro de seguridad obligatorio para tu correo autorizado
+            if email_detectado == "ciberth2011@gmail.com":
                 st.session_state.autenticado = True
-                st.session_state.usuario_email = email_input.strip().lower()
-                st.success("¡Acceso concedido!")
+                st.session_state.user_email = email_detectado
+                st.session_state.user_name = payload.get("name", "Edwin")
+                st.success(f"¡Bienvenido {st.session_state.user_name}!")
                 st.rerun()
             else:
-                st.error("Acceso denegado. Este correo no se encuentra en la lista de usuarios autorizados.")
+                st.error("Acceso denegado. Este correo de Google no se encuentra en la lista de usuarios autorizados.")
 
 # =========================================================================
-# APLICACIÓN PRINCIPAL (SOLO ACCESIBLE SI PASÓ LA VERIFICACIÓN)
+# APLICACIÓN PRINCIPAL (ACCESIBLE TRAS LOGUEARSE)
 # =========================================================================
 else:
-    st.sidebar.write(f"¡Hola, **Edwin**!")
-    st.sidebar.caption(st.session_state.usuario_email)
+    # Barra lateral de usuario
+    st.sidebar.markdown(f"### ¡Hola, **{st.session_state.user_name}**! 👋")
+    st.sidebar.caption(st.session_state.user_email)
     
-    if st.sidebar.button("🚪 Cerrar Sesión"):
+    if st.sidebar.button("🚪 Cerrar Sesión", use_container_width=True):
         st.session_state.autenticado = False
-        st.session_state.usuario_email = None
+        st.session_state.user_email = None
+        st.session_state.user_name = None
         st.rerun()
         
     st.sidebar.divider()
-    opcion = st.sidebar.radio("Selecciona una sección:", ["📉 Control de Peso Corporal", "🏋️ Récords de Fuerza Gym"])
+    opcion = st.sidebar.radio("Navegación del Tracker:", ["📉 Control de Peso Corporal", "🏋️ Récords de Fuerza Gym"])
 
-    # 🔗 Configuración de tus credenciales reales en la nube
-    SPREADSHEET_ID = "1hZuLJED8zV7y4VvQ_D6oewPjaGd1lijnbo4rznzo82Q"
-    SCRIPT_URL = "https://google.com"
-
-    # Intentar leer los datos históricos de Google Sheets de forma pública (URLs corregidas)
+    # Descargar bases de datos históricas de Google Sheets de manera pública
     try:
         df_p_show = pd.read_csv(f"https://google.com{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=PesoCorporal")
         df_g_show = pd.read_csv(f"https://google.com{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=R%C3%A9cordsGym")
     except Exception as e:
-        df_p_show = pd.DataFrame(columns=["Fecha", "Peso Corporal (kg)", "Variación Semanal (kg)", "Notes"])
+        df_p_show = pd.DataFrame(columns=["Fecha", "Peso Corporal (kg)", "Variación Semanal (kg)", "Notas"])
         df_g_show = pd.DataFrame(columns=["Fecha", "Ejercicio", "Peso Levantado (lbs/kg)", "Repeticiones", "RPE (Esfuerzo 1-10)"])
 
     # =========================================================================
-    # PANTALLA 1: PESO CORPORAL
+    # SECCIÓN 1: PESO CORPORAL
     # =========================================================================
     if opcion == "📉 Control de Peso Corporal":
         st.subheader("📉 Pérdida de Peso Corporal")
@@ -115,15 +153,12 @@ else:
                         st.success("¡Peso guardado exitosamente!")
                         st.rerun()
                     else:
-                        st.error(f"Error al conectar con el script. Código: {response.status_code}")
+                        st.error(f"Error en comunicación. Código: {response.status_code}")
                 except Exception as ex:
-                    st.error(f"Error de conexión: {ex}")
-            else:
-                st.error("Falta configurar la variable SCRIPT_URL en el código.")
+                    st.error(f"Error de red: {ex}")
 
-        # Validar y limpiar el DataFrame antes de graficar
+        # Graficar peso histórico
         df_p_show = df_p_show.dropna(subset=["Fecha", "Peso Corporal (kg)"], how="any")
-        
         if not df_p_show.empty:
             df_p_show["Peso Corporal (kg)"] = pd.to_numeric(df_p_show["Peso Corporal (kg)"], errors='coerce')
             df_p_show = df_p_show.sort_values(by="Fecha")
@@ -136,7 +171,7 @@ else:
             st.info("Sincronizando registros con la nube... Si ya guardaste datos, refresca la página en 5 segundos.")
 
     # =========================================================================
-    # PANTALLA 2: RÉCORDS DEL GIMNASIO (REPARADO Y COMPLETADO)
+    # SECCIÓN 2: RÉCORDS DEL GIMNASIO
     # =========================================================================
     elif opcion == "🏋️ Récords de Fuerza Gym":
         st.subheader("🏋️ Registro de Sobrecarga Progresiva")
@@ -152,36 +187,3 @@ else:
             col_g1, col_g2, col_g3 = st.columns(3)
             peso_g = col_g1.number_input("Peso Levantado:", min_value=0.0, max_value=500.0, value=20.0, step=0.5, format="%.1f")
             reps_g = col_g2.number_input("Repeticiones logradas:", min_value=1, max_value=50, value=10, step=1)
-            rpe_g = col_g3.slider("Nivel de Esfuerzo (RPE 1-10):", min_value=1, max_value=10, value=8)
-            boton_g = st.form_submit_button("🚀 Guardar Serie en Google Sheets")
-            
-        if boton_g:
-            if SCRIPT_URL:
-                datos_gym_enviar = {
-                    "sheet": "RécordsGym",
-                    "Fecha": str(fecha_g),
-                    "Ejercicio": str(ejercicio_g),
-                    "Peso Levantado (lbs/kg)": str(peso_g),
-                    "Repeticiones": str(reps_g),
-                    "RPE (Esfuerzo 1-10)": str(rpe_g)
-                }
-                
-                try:
-                    response = requests.post(SCRIPT_URL, json=datos_gym_enviar)
-                    if response.status_code == 200:
-                        st.success("¡Serie de entrenamiento guardada correctamente!")
-                        st.rerun()
-                    else:
-                        st.error(f"Error al guardar en el script. Código: {response.status_code}")
-                except Exception as ex:
-                    st.error(f"Error de conexión: {ex}")
-            else:
-                st.error("Falta configurar la variable SCRIPT_URL.")
-
-        # Mostrar tabla histórica de levantamientos
-        df_g_show = df_g_show.dropna(subset=["Fecha", "Ejercicio"], how="any")
-        if not df_g_show.empty:
-            st.markdown("### 📊 Historial de Levantamientos")
-            st.dataframe(df_g_show, use_container_width=True, hide_index=True)
-        else:
-            st.info("No hay registros de entrenamiento aún o están sincronizándose.")
