@@ -10,7 +10,6 @@ import requests
 st.set_page_config(page_title="Fitness Tracker - Dieta & Gym", page_icon="💪", layout="wide")
 
 # Configurar el flujo de autenticación de Google (OAuth)
-# Los datos CLIENT_ID y CLIENT_SECRET se leen de forma segura desde los Secrets de Streamlit
 try:
     client_config = {
         "web": {
@@ -46,7 +45,6 @@ if "code" in query_params and not st.session_state.autenticado:
         
         st.session_state.autenticado = True
         st.session_state.usuario_info = user_info
-        # Limpiar los parámetros de la URL para que quede estética
         st.query_params.clear()
         st.rerun()
     except Exception as error_login:
@@ -64,12 +62,11 @@ if not st.session_state.autenticado:
     with col_l2:
         st.info("Para proteger tu privacidad y sincronizar tus datos con Google Sheets, debes iniciar sesión con tu cuenta de Google.")
         
-        # Generar la URL oficial de Google para el Login
         try:
             auth_url, _ = flow.authorization_url(prompt='select_account')
-            # Botón de estilo web llamativo para Google
+            # CAMBIO APLICADO: target="_blank" para abrir de forma segura en pestaña nueva
             st.markdown(
-                f'<a href="{auth_url}" target="_self" style="text-decoration: none;">'
+                f'<a href="{auth_url}" target="_blank" style="text-decoration: none;">'
                 '<div style="background-color: #4285F4; color: white; text-align: center; padding: 12px; '
                 'border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">'
                 '🔴 Iniciar sesión con Google'
@@ -98,9 +95,7 @@ else:
 
     SPREADSHEET_ID = "1hZuLJED8zV7y4VvQ_D6oewPjaGd1lijnbo4rznzo82Q"
 
-    # Intentar conexión con la hoja de Google Sheets para leer los datos
     try:
-        # Reutilizamos la conexión de gsheets básica
         df_p_show = pd.read_csv(f"https://google.com{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=PesoCorporal")
         df_g_show = pd.read_csv(f"https://google.com{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=R%C3%A9cordsGym")
     except Exception as e:
@@ -122,7 +117,6 @@ else:
         
         st.divider()
         
-        # El formulario ahora solo muestra la información histórica de forma segura
         if not df_p_show.empty:
             df_p_show["Peso Corporal (kg)"] = pd.to_numeric(df_p_show["Peso Corporal (kg)"], errors='coerce')
             fig_p = px.line(df_p_show, x="Fecha", y="Peso Corporal (kg)", markers=True, title="Evolución del Peso Real vs Meta")
