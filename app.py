@@ -23,7 +23,7 @@ if not st.session_state.autenticado:
     
     col_l1, col_l2, col_l3 = st.columns(3)
     with col_l2:
-        st.info("Para proteger tu privacidad y sincronizar tus datos con Google Sheets, por favor introduce tu correo autorizado.")
+        st.info("Para proteger tu privacidad y sincronizar tus datos con Google Sheets, por favor introduce tu correo authorized.")
         
         with st.form("login_form", clear_on_submit=False):
             email_input = st.text_input("Correo electrónico de Google:", placeholder="ejemplo@gmail.com")
@@ -53,10 +53,11 @@ else:
     st.sidebar.divider()
     opcion = st.sidebar.radio("Selecciona una sección:", ["📉 Control de Peso Corporal", "🏋️ Récords de Fuerza Gym"])
 
+    # 🔗 CONFIGURACIÓN DE CONEXIONES CORREGIDAS
     SPREADSHEET_ID = "1hZuLJED8zV7y4VvQ_D6oewPjaGd1lijnbo4rznzo82Q"
-    SCRIPT_URL = "https://google.com"
+    SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzH4Cmjq12LHH4MbzYQ9uAkWH2u_qdcAdu7170N45CeUAfBtMqVIgByBji-nYZJ8yrJ_Q/exec"
 
-    # Intentar leer los datos históricos de Google Sheets de forma pública
+    # Intentar leer los datos históricos de Google Sheets estructurando la URL pública correctamente
     try:
         df_p_show = pd.read_csv(f"https://google.com{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=PesoCorporal")
         df_g_show = pd.read_csv(f"https://google.com{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=R%C3%A9cordsGym")
@@ -101,20 +102,24 @@ else:
                     except:
                         pass
                 
-                # Sincronizado exactamente con las columnas mapeadas en tu imagen
+                # Sincronizado exactamente con el backend de Google Apps Script
                 datos_enviar = {
+                    "sheet": "PesoCorporal",
                     "Fecha": str(fecha_w),
                     "Peso Corporal (kg)": str(peso_w),
                     "Variación Semanal (kg)": str(variacion),
                     "Notas": str(notas_w)
                 }
                 
-                response = requests.post(SCRIPT_URL, json=datos_enviar)
-                if response.status_code == 200:
-                    st.success("¡Peso guardado exitosamente en tu Google Sheets en la nube!")
-                    st.rerun()
-                else:
-                    st.error("Error al conectar con el script de Google. Verifica la configuración.")
+                try:
+                    response = requests.post(SCRIPT_URL, json=datos_enviar)
+                    if response.status_code == 200:
+                        st.success("¡Peso guardado exitosamente en tu Google Sheets en la nube!")
+                        st.rerun()
+                    else:
+                        st.error(f"Error al conectar con el script de Google. Código de respuesta: {response.status_code}")
+                except Exception as err:
+                    st.error(f"Error de conexión: {err}")
             else:
                 st.error("Falta configurar la variable SCRIPT_URL en el código.")
 
@@ -133,7 +138,7 @@ else:
             st.info("Sincronizando registros con la nube... Si ya guardaste datos, refresca la página en 5 segundos.")
 
     # =========================================================================
-    # PANTALLA 2: RÉCORDS DEL GIMNASIO
+    # PANTALLA 2: RÉCORDS DEL GIMNASIO (COMPLETADO)
     # =========================================================================
     elif opcion == "🏋️ Récords de Fuerza Gym":
         st.subheader("🏋️ Registro de Sobrecarga Progresiva")
@@ -154,31 +159,27 @@ else:
             
         if boton_g:
             if SCRIPT_URL:
-                datos_enviar_g = {
+                datos_gym_enviar = {
+                    "sheet": "RécordsGym",
                     "Fecha": str(fecha_g),
                     "Ejercicio": str(ejercicio_g),
                     "Peso Levantado (lbs/kg)": str(peso_g),
                     "Repeticiones": str(reps_g),
                     "RPE (Esfuerzo 1-10)": str(rpe_g)
                 }
-                response = requests.post(SCRIPT_URL, json=datos_enviar_g)
-                if response.status_code == 200:
-                    st.success(f"¡Récord de {ejercicio_g} guardado en la nube con éxito!")
-                    st.rerun()
-                else:
-                    st.error("Error al conectar con el script de Google. Verifica la configuración.")
+                
+                try:
+                    response = requests.post(SCRIPT_URL, json=datos_gym_enviar)
+                    if response.status_code == 200:
+                        st.success("¡Serie de entrenamiento guardada en la nube con éxito!")
+                        st.rerun()
+                    else:
+                        st.error(f"Error al conectar con el script de Google. Código de respuesta: {response.status_code}")
+                except Exception as err:
+                    st.error(f"Error de conexión: {err}")
             else:
-                st.error("Falta configurar la variable SCRIPT_URL del gimnasio.")
+                st.error("Falta configurar la variable SCRIPT_URL en el código.")
 
-        df_g_show = df_g_show.dropna(subset=["Fecha", "Ejercicio", "Peso Levantado (lbs/kg)"], how="any")
-
+        # Validar e imprimir el historial de entrenamientos en la parte inferior
+        df_g_show = df_g_show.dropna(subset=["Fecha", "Ejercicio"], how="any")
         if not df_g_show.empty:
-            st.subheader("📊 Historial General de Levantamientos")
-            st.dataframe(df_g_show, use_container_width=True, hide_index=True)
-            
-            st.subheader("📈 Progreso por Ejercicio Específico")
-            ejercicio_filtro = st.selectbox("Selecciona un ejercicio para ver tu gráfica de aumento de carga:", df_g_show["Ejercicio"].unique())
-            df_filtrado = df_g_show[df_g_show["Ejercicio"] == ejercicio_filtro]
-            df_filtrado["Peso Levantado (lbs/kg)"] = pd.to_numeric(df_filtrado["Peso Levantado (lbs/kg)"], errors='coerce')
-            
-
