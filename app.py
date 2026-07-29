@@ -14,21 +14,16 @@ st.set_page_config(page_title="PowerFitness - Peso & Sobrecarga", page_icon="�
 CLIENT_ID = st.secrets["google_oauth"]["client_id"]
 CLIENT_SECRET = st.secrets["google_oauth"]["client_secret"]
 
+# URLs estándar e indispensables para la API de Google OAuth2
 AUTHORIZE_URL = "https://google.com"
 TOKEN_URL = "https://googleapis.com"
+REVOKE_URL = "https://googleapis.com"
 
 SPREADSHEET_ID = "1hZuLJED8zV7y4VvQ_D6oewPjaGd1lijnbo4rznzo82Q"
 SCRIPT_URL = "https://google.com"
 
-# 🔥 CORRECCIÓN DEL CONSTRUCTOR: Mapeo de parámetros exacto según streamlit-oauth
-oauth2 = OAuth2Component(
-    id=CLIENT_ID,
-    secret=CLIENT_SECRET,
-    auth_url=AUTHORIZE_URL,
-    token_url=TOKEN_URL,
-    refresh_token_url=TOKEN_URL,
-    revoke_token_url="https://googleapis.com"
-)
+# Inicializar componente OAuth2 de Google respetando los argumentos posicionales estrictos
+oauth2 = OAuth2Component(CLIENT_ID, CLIENT_SECRET, AUTHORIZE_URL, TOKEN_URL, TOKEN_URL, REVOKE_URL)
 
 # Inicializar estados de la sesión si no existen
 if "autenticado" not in st.session_state:
@@ -93,6 +88,7 @@ if not st.session_state.autenticado:
 # APLICACIÓN PRINCIPAL (ACCESIBLE TRAS LOGUEARSE)
 # =========================================================================
 else:
+    # Barra lateral de usuario
     st.sidebar.markdown(f"### ¡Hola, **{st.session_state.user_name}**! 👋")
     st.sidebar.caption(st.session_state.user_email)
     
@@ -105,6 +101,7 @@ else:
     st.sidebar.divider()
     opcion = st.sidebar.radio("Navegación del Tracker:", ["📉 Control de Peso Corporal", "🏋️ Récords de Fuerza Gym"])
 
+    # Descargar bases de datos históricas de Google Sheets de manera pública
     try:
         df_p_show = pd.read_csv(f"https://google.com{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=PesoCorporal")
         df_g_show = pd.read_csv(f"https://google.com{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=R%C3%A9cordsGym")
@@ -126,7 +123,7 @@ else:
         fecha_actual = datetime.date.today()
         fecha_meta = datetime.date(2026, 12, 1)
         dias_restantes = (fecha_meta - fecha_actual).days
-        col3.metric(label="Días para la Meta", value=f"{max(0, dias_restantes)} días")
+        col3.metric(label="Días para la Meta", value=f"{max(0, dias_restantes)} days")
         
         st.divider()
         
@@ -166,6 +163,7 @@ else:
                 except Exception as ex:
                     st.error(f"Error de red: {ex}")
 
+        # Graficar peso histórico
         df_p_show = df_p_show.dropna(subset=["Fecha", "Peso Corporal (kg)"], how="any")
         if not df_p_show.empty:
             df_p_show["Peso Corporal (kg)"] = pd.to_numeric(df_p_show["Peso Corporal (kg)"], errors='coerce')
@@ -193,4 +191,3 @@ else:
             ejercicio_g = st.selectbox("Selecciona el Ejercicio:", ["Press de Banca (Pecho)", "Sentadilla Libre (Pierna)", "Peso Muerto (Espalda/Glúteo)", "Press Militar (Hombro)", "Dominadas / Polea Alta", "Curl de Bíceps", "Extensión de Tríceps"])
             
             col_g1, col_g2, col_g3 = st.columns(3)
-            peso_g = col_g1.number_input("Peso Levantado:", min_value=0.0, max_value=500.0, value=20.0, step=0.5, format="%.1f")
