@@ -3,7 +3,6 @@ import pandas as pd
 import datetime
 import plotly.express as px
 import requests
-import jwt
 from streamlit_oauth import OAuth2Component
 
 # =========================================================================
@@ -42,8 +41,7 @@ if not st.session_state.autenticado:
     with col_l2:
         st.info("Para acceder a tus paneles y sincronizar con Google Sheets, inicia sesión con tu cuenta de Google.")
         
-        # 🌐 DETECCIÓN AUTOMÁTICA DE URL (Local o Nube)
-        # Extrae los encabezados HTTP del navegador para saber la URL exacta donde corre el app
+        # DETECCIÓN AUTOMÁTICA DE URL (Local o Nube)
         headers = st.context.headers
         host = headers.get("Host", "localhost:8501")
         is_https = "https" in headers.get("X-Forwarded-Proto", "")
@@ -60,23 +58,30 @@ if not st.session_state.autenticado:
             use_container_width=True
         )
         
-        # Procesar el token devuelto tras un inicio de sesión exitoso
+        # Procesar el acceso tras un inicio de sesión exitoso
         if result and "token" in result:
-            id_token = result["token"]["id_token"]
+            # Saca de manera segura el correo del flujo sin requerir librerías extras de parseo de JWT
+            access_token = result["token"]["access_token"]
+            userinfo_response = requests.get(
+                "https://googleapis.com",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
             
-            # Decodificar el token de forma segura sin verificar firma localmente (vía PyJWT)
-            payload = jwt.decode(id_token, options={"verify_signature": False})
-            email_detectado = payload.get("email", "").lower()
-            
-            # Filtro de seguridad obligatorio para tu correo autorizado
-            if email_detectado == "ciberth2011@gmail.com":
-                st.session_state.autenticado = True
-                st.session_state.user_email = email_detectado
-                st.session_state.user_name = payload.get("name", "Edwin")
-                st.success(f"¡Bienvenido {st.session_state.user_name}!")
-                st.rerun()
+            if userinfo_response.status_code == 200:
+                user_info = userinfo_response.json()
+                email_detectado = user_info.get("email", "").lower()
+                
+                # Filtro de seguridad obligatorio para tu correo autorizado
+                if email_detectado == "ciberth2011@gmail.com":
+                    st.session_state.autenticado = True
+                    st.session_state.user_email = email_detectado
+                    st.session_state.user_name = user_info.get("name", "Edwin")
+                    st.success(f"¡Bienvenido {st.session_state.user_name}!")
+                    st.rerun()
+                else:
+                    st.error("Acceso denegado. Este correo de Google no se encuentra autorizado.")
             else:
-                st.error("Acceso denegado. Este correo de Google no se encuentra en la lista de usuarios autorizados.")
+                st.error("Fallo en la validación de identidad con Google.")
 
 # =========================================================================
 # APLICACIÓN PRINCIPAL (ACCESIBLE TRAS LOGUEARSE)
@@ -185,5 +190,3 @@ else:
             ejercicio_g = st.selectbox("Selecciona el Ejercicio:", ["Press de Banca (Pecho)", "Sentadilla Libre (Pierna)", "Peso Muerto (Espalda/Glúteo)", "Press Militar (Hombro)", "Dominadas / Polea Alta", "Curl de Bíceps", "Extensión de Tríceps"])
             
             col_g1, col_g2, col_g3 = st.columns(3)
-            peso_g = col_g1.number_input("Peso Levantado:", min_value=0.0, max_value=500.0, value=20.0, step=0.5, format="%.1f")
-            reps_g = col_g2.number_input("Repeticiones logradas:", min_value=1, max_value=50, value=10, step=1)
