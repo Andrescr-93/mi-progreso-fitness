@@ -4,6 +4,7 @@ import datetime
 import plotly.express as px
 import requests
 import urllib.parse
+import streamlit.components.v1 as components
 
 # =========================================================================
 # CONFIGURACIÓN INICIAL Y CREDENCIALES DE GOOGLE
@@ -67,6 +68,7 @@ if "code" in query_params and not st.session_state.autenticado:
                 st.session_state.autenticado = True
                 st.session_state.user_email = email_detectado
                 st.session_state.user_name = user_info.get("name", "Edwin")
+                # Limpiar los parámetros de la URL para estética
                 st.query_params.clear()
                 st.rerun()
             else:
@@ -88,7 +90,7 @@ if not st.session_state.autenticado:
     with col_l2:
         st.info("Para acceder a tus paneles y sincronizar con Google Sheets, inicia sesión con tu cuenta de Google.")
         
-        # CONSTRUCCIÓN DE LA URL OFICIAL DE AUTENTICACIÓN (DIRECCIÓN CORREGIDA)
+        # CONSTRUCCIÓN DE LA URL OFICIAL DE AUTENTICACIÓN
         parametros_google = {
             "client_id": CLIENT_ID,
             "redirect_uri": redirect_uri,
@@ -96,19 +98,27 @@ if not st.session_state.autenticado:
             "scope": "openid email profile",
             "access_type": "online"
         }
-        # 🔥 CORRECCIÓN CLAVE: Agregada la palabra '/auth' a la URL oficial de Google
         url_login_google = f"https://google.com?{urllib.parse.urlencode(parametros_google)}"
         
-        # 🔥 CORRECCIÓN CLAVE: Enlace HTML con target="_top" para romper el iframe e ir a la ventana completa
-        st.markdown(
-            f'<a href="{url_login_google}" target="_top" style="text-decoration: none;">'
-            f'<div style="background-color: #f44336; color: #ffffff; border: 1px solid #d32f2f; '
-            f'padding: 12px 24px; border-radius: 4px; font-size: 16px; font-weight: bold; '
-            f'display: flex; align-items: center; justify-content: center; cursor: pointer; gap: 12px; text-align: center; width: 100%;">'
-            f'🔴 Iniciar Sesión con Google'
-            f'</div></a>',
-            unsafe_allow_html=True
-        )
+        # 🔥 SOLUCIÓN DEFINITIVA: Botón HTML/JS inyectado para romper el iframe de raíz en la pestaña padre
+        html_button = f"""
+        <button onclick="window.parent.location.href='{url_login_google}'" style="
+            width: 100%;
+            background-color: #ff4b4b;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
+            transition: 0.3s;
+        " onmouseover="this.style.backgroundColor='#e04040'" onmouseout="this.style.backgroundColor='#ff4b4b'">
+            🔴 Iniciar Sesión con Google
+        </button>
+        """
+        components.html(html_button, height=60)
 
 # =========================================================================
 # APLICACIÓN PRINCIPAL (ACCESIBLE TRAS LOGUEARSE)
@@ -181,7 +191,7 @@ else:
                         st.success("¡Peso guardado exitosamente!")
                         st.rerun()
                     else:
-                        st.error(f"Error en comunicación. Código: {response.status_code}")
+                        st.error(f"Error en communication. Código: {response.status_code}")
                 except Exception as ex:
                     st.error(f"Error de red: {ex}")
 
@@ -197,5 +207,3 @@ else:
         else:
             st.info("Sincronizando registros con la nube... Si ya guardaste datos, refresca la página.")
 
-    # =========================================================================
-    # SECCIÓN 2: RÉCORDS DEL GIMNASIO
