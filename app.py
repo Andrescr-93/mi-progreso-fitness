@@ -54,9 +54,7 @@ else:
     opcion = st.sidebar.radio("Selecciona una sección:", ["📉 Control de Peso Corporal", "🏋️ Récords de Fuerza Gym"])
 
     SPREADSHEET_ID = "1hZuLJED8zV7y4VvQ_D6oewPjaGd1lijnbo4rznzo82Q"
-    
-    # URL FIJA ASIGNADA DIRECTAMENTE PARA EVITAR ERRORES DE SECRETS
-    SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzH4Cmjq12LHH4MbzYQ9uAkWH2u_qdcAdu7170N45CeUAfBtMqVIgByBji-nYZJ8yrJ_Q/exec"
+    SCRIPT_URL = "https://google.com"
 
     # Intentar leer los datos históricos de Google Sheets de forma pública
     try:
@@ -96,11 +94,14 @@ else:
                 variacion = 0.0
                 if not df_p_show.dropna(how='all').empty:
                     try:
-                        ultimo_peso = float(df_p_show.dropna(how='all').iloc[-1]["Peso Corporal (kg)"])
+                        # Asegurar limpieza de datos para cálculo
+                        df_limpio = df_p_show.dropna(subset=["Peso Corporal (kg)"])
+                        ultimo_peso = float(df_limpio.iloc[-1]["Peso Corporal (kg)"])
                         variacion = round(peso_w - ultimo_peso, 2)
                     except:
                         pass
                 
+                # Sincronizado exactamente con las columnas mapeadas en tu imagen
                 datos_enviar = {
                     "Fecha": str(fecha_w),
                     "Peso Corporal (kg)": str(peso_w),
@@ -117,14 +118,19 @@ else:
             else:
                 st.error("Falta configurar la variable SCRIPT_URL en el código.")
 
-        if not df_p_show.dropna(how='all').empty:
+        # Validar y limpiar el DataFrame antes de graficar
+        df_p_show = df_p_show.dropna(subset=["Fecha", "Peso Corporal (kg)"], how="any")
+        
+        if not df_p_show.empty:
             df_p_show["Peso Corporal (kg)"] = pd.to_numeric(df_p_show["Peso Corporal (kg)"], errors='coerce')
+            df_p_show = df_p_show.sort_values(by="Fecha") # Ordenar cronológicamente para la gráfica
+            
             fig_p = px.line(df_p_show, x="Fecha", y="Peso Corporal (kg)", markers=True, title="Evolución del Peso Real vs Meta")
             fig_p.add_hline(y=65.5, line_dash="dash", line_color="green", annotation_text="Meta (65-66 kg)")
             st.plotly_chart(fig_p, use_container_width=True)
             st.dataframe(df_p_show, use_container_width=True, hide_index=True)
         else:
-            st.info("No hay registros en la nube todavía en la hoja 'PesoCorporal'.")
+            st.info("Sincronizando registros con la nube... Si ya guardaste datos, refresca la página en 5 segundos.")
 
     # =========================================================================
     # PANTALLA 2: RÉCORDS DEL GIMNASIO
@@ -153,7 +159,7 @@ else:
                     "Ejercicio": str(ejercicio_g),
                     "Peso Levantado (lbs/kg)": str(peso_g),
                     "Repeticiones": str(reps_g),
-                    "E1-10": str(rpe_g)
+                    "RPE (Esfuerzo 1-10)": str(rpe_g)
                 }
                 response = requests.post(SCRIPT_URL, json=datos_enviar_g)
                 if response.status_code == 200:
@@ -162,9 +168,11 @@ else:
                 else:
                     st.error("Error al conectar con el script de Google. Verifica la configuración.")
             else:
-                st.error("Falta configurar la variable SCRIPT_URL en el código.")
+                st.error("Falta configurar la variable SCRIPT_URL del gimnasio.")
 
-        if not df_g_show.dropna(how='all').empty:
+        df_g_show = df_g_show.dropna(subset=["Fecha", "Ejercicio", "Peso Levantado (lbs/kg)"], how="any")
+
+        if not df_g_show.empty:
             st.subheader("📊 Historial General de Levantamientos")
             st.dataframe(df_g_show, use_container_width=True, hide_index=True)
             
@@ -173,7 +181,4 @@ else:
             df_filtrado = df_g_show[df_g_show["Ejercicio"] == ejercicio_filtro]
             df_filtrado["Peso Levantado (lbs/kg)"] = pd.to_numeric(df_filtrado["Peso Levantado (lbs/kg)"], errors='coerce')
             
-            fig_g = px.line(df_filtrado, x="Fecha", y="Peso Levantado (lbs/kg)", markers=True, text="Repeticiones", title=f"Evolución de Carga en: {ejercicio_filtro}")
-            st.plotly_chart(fig_g, use_container_width=True)
-        else:
-            st.info("No hay registros en la nube todavía en la hoja 'RécordsGym'.")
+
