@@ -41,7 +41,6 @@ query_params = st.query_params
 if "code" in query_params and not st.session_state.autenticado:
     codigo_autorizacion = query_params["code"]
     
-    # Intercambiar el código por un token de acceso definitivo
     payload_token = {
         "code": codigo_autorizacion,
         "client_id": CLIENT_ID,
@@ -55,7 +54,6 @@ if "code" in query_params and not st.session_state.autenticado:
     if token_response.status_code == 200:
         access_token = token_response.json().get("access_token")
         
-        # Consultar los datos del usuario con el token obtenido
         userinfo_response = requests.get(
             "https://googleapis.com",
             headers={"Authorization": f"Bearer {access_token}"}
@@ -65,7 +63,6 @@ if "code" in query_params and not st.session_state.autenticado:
             user_info = userinfo_response.json()
             email_detectado = user_info.get("email", "").lower()
             
-            # Filtro estricto de seguridad para tu correo autorizado
             if email_detectado == "ciberth2011@gmail.com":
                 st.session_state.autenticado = True
                 st.session_state.user_email = email_detectado
@@ -79,10 +76,11 @@ if "code" in query_params and not st.session_state.autenticado:
     else:
         st.error("El código de autorización de Google expiró o es inválido. Intenta de nuevo.")
 
+
 # =========================================================================
-# PANTALLA DE INICIO DE SESIÓN (LOGIN UI)
+# FUNCIÓN: VISTA DE INICIO DE SESIÓN
 # =========================================================================
-if not st.session_state.autenticado:
+def mostrar_pantalla_login():
     st.markdown("<h1 style='text-align: center; margin-top: 50px;'>💪 PowerFitness Tracker</h1>", unsafe_allow_html=True)
     st.markdown("<h4 style='text-align: center; color: gray;'>Gestiona tu composición corporal y récords de fuerza de forma segura</h4>", unsafe_allow_html=True)
     st.write("---")
@@ -91,7 +89,6 @@ if not st.session_state.autenticado:
     with col_l2:
         st.info("Para acceder a tus paneles y sincronizar con Google Sheets, inicia sesión con tu cuenta de Google.")
         
-        # CONSTRUCCIÓN DE LA URL OFICIAL DE AUTENTICACIÓN
         parametros_google = {
             "client_id": CLIENT_ID,
             "redirect_uri": redirect_uri,
@@ -101,20 +98,45 @@ if not st.session_state.autenticado:
         }
         url_login_google = f"{AUTHORIZE_URL}?{urllib.parse.urlencode(parametros_google)}"
         
-        # 🔥 SOLUCIÓN: Fragmento aislado y redirección por inyección HTML limpia sin usar componentes obsoletos
-        @st.fragment
-        def renderizar_boton_login():
-            if st.button("🔴 Iniciar Sesión con Google", use_container_width=True):
-                st.markdown(f'<iframe src="{url_login_google}" style="display:none;"></iframe>', unsafe_allow_html=True)
-                st.write(f'<script>window.top.location.href="{url_login_google}";</script>', unsafe_allow_html=True)
-                st.markdown(f'<meta http-equiv="refresh" content="0;url={url_login_google}">', unsafe_allow_html=True)
-        
-        renderizar_boton_login()
+        # HTML limpio embebido para ejecutar redirección del navegador del usuario sin bloquear el backend
+        html_button = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ margin: 0; padding: 0; overflow: hidden; }}
+                .btn {{
+                    width: 100%;
+                    background-color: #ff4b4b;
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    font-family: sans-serif;
+                    box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
+                    transition: 0.3s;
+                    text-align: center;
+                }}
+                .btn:hover {{ background-color: #e04040; }}
+            </style>
+        </head>
+        <body>
+            <button class="btn" onclick="window.parent.location.href='{url_login_google}'">
+                🔴 Iniciar Sesión con Google
+            </button>
+        </body>
+        </html>
+        """
+        st.iframe(f"data:text/html;charset=utf-8,{urllib.parse.quote(html_button)}", height=65)
+
 
 # =========================================================================
-# APLICACIÓN PRINCIPAL (ACCESIBLE TRAS LOGUEARSE)
+# FUNCIÓN: VISTA DE LA APLICACIÓN PRINCIPAL
 # =========================================================================
-else:
+def mostrar_aplicacion_principal():
     st.sidebar.markdown(f"### ¡Hola, **{st.session_state.user_name}**! 👋")
     st.sidebar.caption(st.session_state.user_email)
     
@@ -134,9 +156,7 @@ else:
         df_p_show = pd.DataFrame(columns=["Fecha", "Peso Corporal (kg)", "Variación Semanal (kg)", "Notas"])
         df_g_show = pd.DataFrame(columns=["Fecha", "Ejercicio", "Peso Levantado (lbs/kg)", "Repeticiones", "RPE (Esfuerzo 1-10)"])
 
-    # =========================================================================
-    # SECCIÓN 1: PESO CORPORAL
-    # =========================================================================
+    # PANTALLA 1: PESO CORPORAL
     if opcion == "📉 Control de Peso Corporal":
         st.subheader("📉 Pérdida de Peso Corporal")
         st.markdown("### Objetivo: Pérdida de grasa manteniendo masa muscular")
@@ -198,7 +218,5 @@ else:
         else:
             st.info("Sincronizando registros con la nube... Si ya guardaste datos, refresca la página.")
 
-    # =========================================================================
-    # SECCIÓN 2: RÉCORDS DEL GIMNASIO
-    # =========================================================================
-    elif opcion == "🏋️ Récords de Fuerza Gym":
+    # PANTALLA 2: RÉCORDS DEL GIMNASIO
+
