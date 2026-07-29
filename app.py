@@ -15,6 +15,9 @@ st.set_page_config(page_title="PowerFitness - Peso & Sobrecarga", page_icon="�
 CLIENT_ID = st.secrets["google_oauth"]["client_id"]
 CLIENT_SECRET = st.secrets["google_oauth"]["client_secret"]
 
+AUTHORIZE_URL = "https://google.com"
+TOKEN_URL = "https://googleapis.com"
+
 SPREADSHEET_ID = "1hZuLJED8zV7y4VvQ_D6oewPjaGd1lijnbo4rznzo82Q"
 SCRIPT_URL = "https://google.com"
 
@@ -48,7 +51,7 @@ if "code" in query_params and not st.session_state.autenticado:
         "grant_type": "authorization_code"
     }
     
-    token_response = requests.post("https://googleapis.com", data=payload_token)
+    token_response = requests.post(TOKEN_URL, data=payload_token)
     
     if token_response.status_code == 200:
         access_token = token_response.json().get("access_token")
@@ -68,7 +71,6 @@ if "code" in query_params and not st.session_state.autenticado:
                 st.session_state.autenticado = True
                 st.session_state.user_email = email_detectado
                 st.session_state.user_name = user_info.get("name", "Edwin")
-                # Limpiar los parámetros de la URL para estética
                 st.query_params.clear()
                 st.rerun()
             else:
@@ -98,9 +100,9 @@ if not st.session_state.autenticado:
             "scope": "openid email profile",
             "access_type": "online"
         }
-        url_login_google = f"https://google.com?{urllib.parse.urlencode(parametros_google)}"
+        url_login_google = f"{AUTHORIZE_URL}?{urllib.parse.urlencode(parametros_google)}"
         
-        # 🔥 SOLUCIÓN DEFINITIVA: Botón HTML/JS inyectado para romper el iframe de raíz en la pestaña padre
+        # Inyección JavaScript para redirigir la pestaña principal directamente a Google de forma instantánea
         html_button = f"""
         <button onclick="window.parent.location.href='{url_login_google}'" style="
             width: 100%;
@@ -191,7 +193,7 @@ else:
                         st.success("¡Peso guardado exitosamente!")
                         st.rerun()
                     else:
-                        st.error(f"Error en communication. Código: {response.status_code}")
+                        st.error(f"Error en comunicación. Código: {response.status_code}")
                 except Exception as ex:
                     st.error(f"Error de red: {ex}")
 
