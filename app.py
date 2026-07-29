@@ -101,40 +101,15 @@ if not st.session_state.autenticado:
         }
         url_login_google = f"{AUTHORIZE_URL}?{urllib.parse.urlencode(parametros_google)}"
         
-        # HTML encapsulado que se mostrará de forma segura dentro del nuevo st.iframe
-        html_button = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {{ margin: 0; padding: 0; overflow: hidden; }}
-                .btn {{
-                    width: 100%;
-                    background-color: #ff4b4b;
-                    color: white;
-                    border: none;
-                    padding: 12px 24px;
-                    border-radius: 8px;
-                    font-size: 16px;
-                    font-weight: bold;
-                    cursor: pointer;
-                    font-family: sans-serif;
-                    box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
-                    transition: 0.3s;
-                    text-align: center;
-                }}
-                .btn:hover {{ background-color: #e04040; }}
-            </style>
-        </head>
-        <body>
-            <button class="btn" onclick="window.parent.location.href='{url_login_google}'">
-                🔴 Iniciar Sesión con Google
-            </button>
-        </body>
-        </html>
-        """
-        # 🔥 CORRECCIÓN CLAVE: Usamos st.iframe en cumplimiento con la nueva sintaxis para incrustar el HTML
-        st.iframe(f"data:text/html;charset=utf-8,{urllib.parse.quote(html_button)}", height=65)
+        # 🔥 SOLUCIÓN: Fragmento aislado y redirección por inyección HTML limpia sin usar componentes obsoletos
+        @st.fragment
+        def renderizar_boton_login():
+            if st.button("🔴 Iniciar Sesión con Google", use_container_width=True):
+                st.markdown(f'<iframe src="{url_login_google}" style="display:none;"></iframe>', unsafe_allow_html=True)
+                st.write(f'<script>window.top.location.href="{url_login_google}";</script>', unsafe_allow_html=True)
+                st.markdown(f'<meta http-equiv="refresh" content="0;url={url_login_google}">', unsafe_allow_html=True)
+        
+        renderizar_boton_login()
 
 # =========================================================================
 # APLICACIÓN PRINCIPAL (ACCESIBLE TRAS LOGUEARSE)
@@ -216,3 +191,14 @@ else:
             df_p_show["Peso Corporal (kg)"] = pd.to_numeric(df_p_show["Peso Corporal (kg)"], errors='coerce')
             df_p_show = df_p_show.sort_values(by="Fecha")
             
+            fig_p = px.line(df_p_show, x="Fecha", y="Peso Corporal (kg)", markers=True, title="Evolución del Peso Real vs Meta")
+            fig_p.add_hline(y=65.5, line_dash="dash", line_color="green", annotation_text="Meta (65-66 kg)")
+            st.plotly_chart(fig_p, use_container_width=True)
+            st.dataframe(df_p_show, use_container_width=True, hide_index=True)
+        else:
+            st.info("Sincronizando registros con la nube... Si ya guardaste datos, refresca la página.")
+
+    # =========================================================================
+    # SECCIÓN 2: RÉCORDS DEL GIMNASIO
+    # =========================================================================
+    elif opcion == "🏋️ Récords de Fuerza Gym":
