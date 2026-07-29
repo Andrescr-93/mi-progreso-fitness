@@ -3,27 +3,19 @@ import pandas as pd
 import datetime
 import plotly.express as px
 import requests
-from streamlit_oauth import OAuth2Component
+import urllib.parse
 
 # =========================================================================
-# CONFIGURACIÓN INICIAL Y LLAMADO SEGURO A SECRETS
+# CONFIGURACIÓN INICIAL Y CREDENCIALES DE GOOGLE
 # =========================================================================
 st.set_page_config(page_title="PowerFitness - Peso & Sobrecarga", page_icon="💪", layout="wide")
 
-# Lectura cifrada y segura desde tus Secrets configurados
+# Lectura segura desde tus Secrets en Streamlit Cloud
 CLIENT_ID = st.secrets["google_oauth"]["client_id"]
 CLIENT_SECRET = st.secrets["google_oauth"]["client_secret"]
 
-# URLs estándar e indispensables para la API de Google OAuth2
-AUTHORIZE_URL = "https://google.com"
-TOKEN_URL = "https://googleapis.com"
-REVOKE_URL = "https://googleapis.com"
-
 SPREADSHEET_ID = "1hZuLJED8zV7y4VvQ_D6oewPjaGd1lijnbo4rznzo82Q"
 SCRIPT_URL = "https://google.com"
-
-# Inicializar componente OAuth2 de Google respetando los argumentos posicionales estrictos
-oauth2 = OAuth2Component(CLIENT_ID, CLIENT_SECRET, AUTHORIZE_URL, TOKEN_URL, TOKEN_URL, REVOKE_URL)
 
 # Inicializar estados de la sesión si no existen
 if "autenticado" not in st.session_state:
@@ -31,8 +23,63 @@ if "autenticado" not in st.session_state:
 if "user_email" not in st.session_state:
     st.session_state.user_email = None
 
+# DETECCIÓN AUTOMÁTICA DE LA URL ACTUAL DE LA APP
+headers = st.context.headers
+host = headers.get("Host", "localhost:8501")
+is_https = "https" in headers.get("X-Forwarded-Proto", "")
+protocol = "https" if is_https else "http"
+redirect_uri = f"{protocol}://{host}/"
+
 # =========================================================================
-# PANTALLA DE INICIO DE SESIÓN CON GOOGLE
+# PROCESAR RETORNO DE GOOGLE OAUTH (CAPTURA DE CODE)
+# =========================================================================
+# Cuando Google regresa a nuestra app, nos da un parámetro '?code=...' en la URL
+query_params = st.query_params
+
+if "code" in query_params and not st.session_state.autenticado:
+    codigo_autorizacion = query_params["code"]
+    
+    # Intercambiar el código por un token de acceso definitivo
+    payload_token = {
+        "code": codigo_autorizacion,
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code"
+    }
+    
+    token_response = requests.post("https://googleapis.com", data=payload_token)
+    
+    if token_response.status_code == 200:
+        access_token = token_response.json().get("access_token")
+        
+        # Consultar los datos del usuario con el token obtenido
+        userinfo_response = requests.get(
+            "https://googleapis.com",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        
+        if userinfo_response.status_code == 200:
+            user_info = userinfo_response.json()
+            email_detectado = user_info.get("email", "").lower()
+            
+            # Filtro estricto de seguridad para tu correo autorizado
+            if email_detectado == "ciberth2011@gmail.com":
+                st.session_state.autenticado = True
+                st.session_state.user_email = email_detectado
+                st.session_state.user_name = user_info.get("name", "Edwin")
+                # Limpiar los parámetros de la URL para estética
+                st.query_params.clear()
+                st.rerun()
+            else:
+                st.error("Acceso denegado. Este correo de Google no se encuentra autorizado.")
+        else:
+            st.error("Error al obtener la información de perfil desde Google.")
+    else:
+        st.error("El código de autorización de Google expiró o es inválido. Intenta de nuevo.")
+
+# =========================================================================
+# PANTALLA DE INICIO DE SESIÓN (LOGIN UI)
 # =========================================================================
 if not st.session_state.autenticado:
     st.markdown("<h1 style='text-align: center; margin-top: 50px;'>💪 PowerFitness Tracker</h1>", unsafe_allow_html=True)
@@ -43,52 +90,32 @@ if not st.session_state.autenticado:
     with col_l2:
         st.info("Para acceder a tus paneles y sincronizar con Google Sheets, inicia sesión con tu cuenta de Google.")
         
-        # DETECCIÓN AUTOMÁTICA DE URL (Local o Nube)
-        headers = st.context.headers
-        host = headers.get("Host", "localhost:8501")
-        is_https = "https" in headers.get("X-Forwarded-Proto", "")
-        protocol = "https" if is_https else "http"
-        current_url = f"{protocol}://{host}/"
+        # CONSTRUCCIÓN DE LA URL OFICIAL DE AUTENTICACIÓN
+        parametros_google = {
+            "client_id": CLIENT_ID,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": "openid email profile",
+            "access_type": "online"
+        }
+        url_login_google = f"https://google.com?{urllib.parse.urlencode(parametros_google)}"
         
-        # Renderizar el botón nativo de Google Sign-In
-        result = oauth2.authorize_button(
-            name="Continuar con Google",
-            icon="https://wikimedia.org",
-            redirect_uri=current_url,
-            scope="openid email profile",
-            key="google_auth",
-            use_container_width=True
+        # Botón estilizado nativo que abre el flujo real de Google en la misma pestaña
+        st.markdown(
+            f'<a href="{url_login_google}" target="_self" style="text-decoration: none;">'
+            f'<div style="background-color: #ffffff; color: #757575; border: 1px solid #e0e0e0; '
+            f'padding: 10px 24px; border-radius: 4px; font-size: 16px; font-weight: 500; '
+            f'display: flex; align-items: center; justify-content: center; cursor: pointer; gap: 12px; text-align: center;">'
+            f'<img src="https://wikimedia.org" style="width: 20px; height: 20px;"/>'
+            f'Continuar con Google'
+            f'</div></a>',
+            unsafe_allow_html=True
         )
-        
-        # Procesar el acceso tras un inicio de sesión exitoso
-        if result and "token" in result:
-            access_token = result["token"]["access_token"]
-            userinfo_response = requests.get(
-                "https://googleapis.com",
-                headers={"Authorization": f"Bearer {access_token}"}
-            )
-            
-            if userinfo_response.status_code == 200:
-                user_info = userinfo_response.json()
-                email_detectado = user_info.get("email", "").lower()
-                
-                # Filtro de seguridad obligatorio para tu correo autorizado
-                if email_detectado == "ciberth2011@gmail.com":
-                    st.session_state.autenticado = True
-                    st.session_state.user_email = email_detectado
-                    st.session_state.user_name = user_info.get("name", "Edwin")
-                    st.success(f"¡Bienvenido {st.session_state.user_name}!")
-                    st.rerun()
-                else:
-                    st.error("Acceso denegado. Este correo de Google no se encuentra autorizado.")
-            else:
-                st.error("Fallo en la validación de identidad con Google.")
 
 # =========================================================================
 # APLICACIÓN PRINCIPAL (ACCESIBLE TRAS LOGUEARSE)
 # =========================================================================
 else:
-    # Barra lateral de usuario
     st.sidebar.markdown(f"### ¡Hola, **{st.session_state.user_name}**! 👋")
     st.sidebar.caption(st.session_state.user_email)
     
@@ -101,7 +128,6 @@ else:
     st.sidebar.divider()
     opcion = st.sidebar.radio("Navegación del Tracker:", ["📉 Control de Peso Corporal", "🏋️ Récords de Fuerza Gym"])
 
-    # Descargar bases de datos históricas de Google Sheets de manera pública
     try:
         df_p_show = pd.read_csv(f"https://google.com{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=PesoCorporal")
         df_g_show = pd.read_csv(f"https://google.com{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=R%C3%A9cordsGym")
@@ -120,10 +146,8 @@ else:
         col1.metric(label="Meta de Peso", value="65 - 66 kg")
         col2.metric(label="Fecha Límite", value="Diciembre 2026")
         
-        fecha_actual = datetime.date.today()
-        fecha_meta = datetime.date(2026, 12, 1)
-        dias_restantes = (fecha_meta - fecha_actual).days
-        col3.metric(label="Días para la Meta", value=f"{max(0, dias_restantes)} days")
+        dias_restantes = (datetime.date(2026, 12, 1) - datetime.date.today()).days
+        col3.metric(label="Días para la Meta", value=f"{max(0, dias_restantes)} días")
         
         st.divider()
         
@@ -163,7 +187,6 @@ else:
                 except Exception as ex:
                     st.error(f"Error de red: {ex}")
 
-        # Graficar peso histórico
         df_p_show = df_p_show.dropna(subset=["Fecha", "Peso Corporal (kg)"], how="any")
         if not df_p_show.empty:
             df_p_show["Peso Corporal (kg)"] = pd.to_numeric(df_p_show["Peso Corporal (kg)"], errors='coerce')
@@ -174,20 +197,5 @@ else:
             st.plotly_chart(fig_p, use_container_width=True)
             st.dataframe(df_p_show, use_container_width=True, hide_index=True)
         else:
-            st.info("Sincronizando registros con la nube... Si ya guardaste datos, refresca la página en 5 segundos.")
+            st.info("Sincronizando registros con la nube... Si ya guardaste datos, refresca la página.")
 
-    # =========================================================================
-    # SECCIÓN 2: RÉCORDS DEL GIMNASIO
-    # =========================================================================
-    elif opcion == "🏋️ Récords de Fuerza Gym":
-        st.subheader("🏋️ Registro de Sobrecarga Progresiva")
-        st.markdown("### Objetivo: Subir la fuerza en el gimnasio para evitar perder músculo en el déficit")
-        
-        st.divider()
-        
-        with st.form("formulario_gym", clear_on_submit=True):
-            st.subheader("💪 Registrar Serie Pesada")
-            fecha_g = st.date_input("Fecha del entrenamiento:", datetime.date.today(), key="fecha_gym")
-            ejercicio_g = st.selectbox("Selecciona el Ejercicio:", ["Press de Banca (Pecho)", "Sentadilla Libre (Pierna)", "Peso Muerto (Espalda/Glúteo)", "Press Militar (Hombro)", "Dominadas / Polea Alta", "Curl de Bíceps", "Extensión de Tríceps"])
-            
-            col_g1, col_g2, col_g3 = st.columns(3)
