@@ -20,8 +20,15 @@ TOKEN_URL = "https://googleapis.com"
 SPREADSHEET_ID = "1hZuLJED8zV7y4VvQ_D6oewPjaGd1lijnbo4rznzo82Q"
 SCRIPT_URL = "https://google.com"
 
-# Inicializar componente OAuth2 de Google con los parámetros correctos de la librería
-oauth2 = OAuth2Component(CLIENT_ID, CLIENT_SECRET, AUTHORIZE_URL, TOKEN_URL, TOKEN_URL, "")
+# 🔥 CORRECCIÓN DEL TYPEERROR: Inicialización exacta según la documentación de streamlit-oauth
+oauth2 = OAuth2Component(
+    client_id=CLIENT_ID,
+    client_secret=CLIENT_SECRET,
+    authorize_endpoint=AUTHORIZE_URL,
+    token_endpoint=TOKEN_URL,
+    refresh_token_endpoint=TOKEN_URL,
+    revoke_token_endpoint="https://googleapis.com"
+)
 
 # Inicializar estados de la sesión si no existen
 if "autenticado" not in st.session_state:
@@ -187,5 +194,3 @@ else:
             st.subheader("💪 Registrar Serie Pesada")
             fecha_g = st.date_input("Fecha del entrenamiento:", datetime.date.today(), key="fecha_gym")
             ejercicio_g = st.selectbox("Selecciona el Ejercicio:", ["Press de Banca (Pecho)", "Sentadilla Libre (Pierna)", "Peso Muerto (Espalda/Glúteo)", "Press Militar (Hombro)", "Dominadas / Polea Alta", "Curl de Bíceps", "Extensión de Tríceps"])
-            
-            col_g1, col_g2, col_g3 = st.columns(3)
