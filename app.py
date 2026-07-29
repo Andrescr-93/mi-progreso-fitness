@@ -23,7 +23,7 @@ if not st.session_state.autenticado:
     
     col_l1, col_l2, col_l3 = st.columns(3)
     with col_l2:
-        st.info("Para proteger tu privacidad y sincronizar tus datos con Google Sheets, por favor introduce tu correo authorized.")
+        st.info("Para proteger tu privacidad y sincronizar tus datos con Google Sheets, por favor introduce tu correo autorizado.")
         
         with st.form("login_form", clear_on_submit=False):
             email_input = st.text_input("Correo electrónico de Google:", placeholder="ejemplo@gmail.com")
@@ -53,16 +53,16 @@ else:
     st.sidebar.divider()
     opcion = st.sidebar.radio("Selecciona una sección:", ["📉 Control de Peso Corporal", "🏋️ Récords de Fuerza Gym"])
 
-    # 🔗 CONFIGURACIÓN DE CONEXIONES CORREGIDAS
+    # 🔗 Configuración de tus credenciales reales en la nube
     SPREADSHEET_ID = "1hZuLJED8zV7y4VvQ_D6oewPjaGd1lijnbo4rznzo82Q"
-    SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzH4Cmjq12LHH4MbzYQ9uAkWH2u_qdcAdu7170N45CeUAfBtMqVIgByBji-nYZJ8yrJ_Q/exec"
+    SCRIPT_URL = "https://google.com"
 
-    # Intentar leer los datos históricos de Google Sheets estructurando la URL pública correctamente
+    # Intentar leer los datos históricos de Google Sheets de forma pública (URLs corregidas)
     try:
         df_p_show = pd.read_csv(f"https://google.com{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=PesoCorporal")
         df_g_show = pd.read_csv(f"https://google.com{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=R%C3%A9cordsGym")
     except Exception as e:
-        df_p_show = pd.DataFrame(columns=["Fecha", "Peso Corporal (kg)", "Variación Semanal (kg)", "Notas"])
+        df_p_show = pd.DataFrame(columns=["Fecha", "Peso Corporal (kg)", "Variación Semanal (kg)", "Notes"])
         df_g_show = pd.DataFrame(columns=["Fecha", "Ejercicio", "Peso Levantado (lbs/kg)", "Repeticiones", "RPE (Esfuerzo 1-10)"])
 
     # =========================================================================
@@ -95,14 +95,12 @@ else:
                 variacion = 0.0
                 if not df_p_show.dropna(how='all').empty:
                     try:
-                        # Asegurar limpieza de datos para cálculo
                         df_limpio = df_p_show.dropna(subset=["Peso Corporal (kg)"])
                         ultimo_peso = float(df_limpio.iloc[-1]["Peso Corporal (kg)"])
                         variacion = round(peso_w - ultimo_peso, 2)
                     except:
                         pass
                 
-                # Sincronizado exactamente con el backend de Google Apps Script
                 datos_enviar = {
                     "sheet": "PesoCorporal",
                     "Fecha": str(fecha_w),
@@ -114,12 +112,12 @@ else:
                 try:
                     response = requests.post(SCRIPT_URL, json=datos_enviar)
                     if response.status_code == 200:
-                        st.success("¡Peso guardado exitosamente en tu Google Sheets en la nube!")
+                        st.success("¡Peso guardado exitosamente!")
                         st.rerun()
                     else:
-                        st.error(f"Error al conectar con el script de Google. Código de respuesta: {response.status_code}")
-                except Exception as err:
-                    st.error(f"Error de conexión: {err}")
+                        st.error(f"Error al conectar con el script. Código: {response.status_code}")
+                except Exception as ex:
+                    st.error(f"Error de conexión: {ex}")
             else:
                 st.error("Falta configurar la variable SCRIPT_URL en el código.")
 
@@ -128,7 +126,7 @@ else:
         
         if not df_p_show.empty:
             df_p_show["Peso Corporal (kg)"] = pd.to_numeric(df_p_show["Peso Corporal (kg)"], errors='coerce')
-            df_p_show = df_p_show.sort_values(by="Fecha") # Ordenar cronológicamente para la gráfica
+            df_p_show = df_p_show.sort_values(by="Fecha")
             
             fig_p = px.line(df_p_show, x="Fecha", y="Peso Corporal (kg)", markers=True, title="Evolución del Peso Real vs Meta")
             fig_p.add_hline(y=65.5, line_dash="dash", line_color="green", annotation_text="Meta (65-66 kg)")
@@ -138,7 +136,7 @@ else:
             st.info("Sincronizando registros con la nube... Si ya guardaste datos, refresca la página en 5 segundos.")
 
     # =========================================================================
-    # PANTALLA 2: RÉCORDS DEL GIMNASIO (COMPLETADO)
+    # PANTALLA 2: RÉCORDS DEL GIMNASIO (REPARADO Y COMPLETADO)
     # =========================================================================
     elif opcion == "🏋️ Récords de Fuerza Gym":
         st.subheader("🏋️ Registro de Sobrecarga Progresiva")
@@ -171,15 +169,19 @@ else:
                 try:
                     response = requests.post(SCRIPT_URL, json=datos_gym_enviar)
                     if response.status_code == 200:
-                        st.success("¡Serie de entrenamiento guardada en la nube con éxito!")
+                        st.success("¡Serie de entrenamiento guardada correctamente!")
                         st.rerun()
                     else:
-                        st.error(f"Error al conectar con el script de Google. Código de respuesta: {response.status_code}")
-                except Exception as err:
-                    st.error(f"Error de conexión: {err}")
+                        st.error(f"Error al guardar en el script. Código: {response.status_code}")
+                except Exception as ex:
+                    st.error(f"Error de conexión: {ex}")
             else:
-                st.error("Falta configurar la variable SCRIPT_URL en el código.")
+                st.error("Falta configurar la variable SCRIPT_URL.")
 
-        # Validar e imprimir el historial de entrenamientos en la parte inferior
+        # Mostrar tabla histórica de levantamientos
         df_g_show = df_g_show.dropna(subset=["Fecha", "Ejercicio"], how="any")
         if not df_g_show.empty:
+            st.markdown("### 📊 Historial de Levantamientos")
+            st.dataframe(df_g_show, use_container_width=True, hide_index=True)
+        else:
+            st.info("No hay registros de entrenamiento aún o están sincronizándose.")
